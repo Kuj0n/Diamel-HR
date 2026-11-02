@@ -1,0 +1,34 @@
+# ============================================================
+# DANE OSOBOWE PRACOWNIKÓW (RODO) - NIGDY DO REPOZYTORIUM
+# Lista pracowników jest w panelu HR na diamel.pl, program pobiera ją po zalogowaniu.
+# ============================================================
+Konfiguracja/
+Skrypty_Bazy/
+Roboczy/
+ERP HR_*.txt
+*.XLS
+*.xls
+*.xlsx
+*.csv
+settings_v*.json
+
+# Wydania (buildy PyInstaller, instalatory .exe) - publikowane jako GitHub Releases
+[0-9]*.[0-9]*.[0-9]*/
+_Historia_Wersji/
+Backup*/
+build/
+dist/
+*.spec
+
+# Logotypy innych firm (Roger / ASSA ABLOY, Comarch) - są w instalatorze, nie w repozytorium
+Zasoby/HR połączenia.png
+Zasoby/HR połączenia pion.png
+Zasoby/HR_polaczenia_pion.bmp
+Zasoby/Comarch ERP XL HR.jpg
+Zasoby/Roger RCP Master 4.jpg
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
