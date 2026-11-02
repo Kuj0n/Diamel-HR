@@ -128,8 +128,14 @@ def okno_logowania(root):
     f_btn.pack(pady=(8, 4))
     tk.Button(f_btn, text="Zaloguj", command=zaloguj, bg="#2196F3", fg="white", font=("Arial", 10, "bold"), width=12).pack(side="left", padx=5)
     tk.Button(f_btn, text="Anuluj", command=okno.destroy, width=10).pack(side="left", padx=5)
-    tk.Button(okno, text="Nie pamiętam hasła", command=nie_pamietam, fg="#555555", relief="flat",
-              font=("Arial", 9, "underline"), cursor="hand2").pack(pady=(0, 14))
+    f_linki = tk.Frame(okno)
+    f_linki.pack(pady=(0, 14))
+    tk.Button(f_linki, text="Nie pamiętam hasła", command=nie_pamietam, fg="#555555", relief="flat",
+              font=("Arial", 9, "underline"), cursor="hand2").pack(side="left", padx=5)
+    # Aktualizacja bez logowania - poprawka problemu z logowaniem musi dać się zainstalować
+    from narzedzia import sprawdz_aktualizacje
+    tk.Button(f_linki, text="Sprawdź aktualizacje", command=lambda: sprawdz_aktualizacje(okno, tryb="recznie"), fg="#555555",
+              relief="flat", font=("Arial", 9, "underline"), cursor="hand2").pack(side="left", padx=5)
     okno.bind("<Return>", zaloguj)
     e_login.focus_set()
     root.wait_window(okno)

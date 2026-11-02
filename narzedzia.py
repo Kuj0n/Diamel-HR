@@ -56,16 +56,44 @@ def pokaz_monit_aktualizacji(root, nowa_wersja, link, changelog):
     if odp:
         pobierz_i_zainstaluj(root, link)
 
+def sprawdz_aktualizacje_przed_startem(root):
+    """
+    Sprawdza aktualizację przed logowaniem do bazy pracowników - poprawkę da się zainstalować,
+    nawet gdy logowanie nie działa. Brak internetu / GitHub niedostępny: program startuje normalnie.
+    """
+    try:
+        dane, zalaczniki = pobierz_wydanie()
+    except Exception:
+        return
+    wersja_serwera = dane.get("tag_name", "0.0.0").lstrip("vV")
+    link = next((url for nazwa, url in zalaczniki.items() if nazwa.lower().endswith(".exe")), "")
+    if not link or wez_krotke(wersja_serwera) <= wez_krotke(VERSION):
+        return
+    odp = messagebox.askyesno(
+        "Dostępna nowa wersja!",
+        f"Dostępna jest nowa wersja programu: {wersja_serwera} (Twoja: {VERSION})\n\n"
+        f"CO NOWEGO:\n{dane.get('body') or 'Brak informacji o nowościach.'}\n\n"
+        f"Czy chcesz, abym pobrał i uruchomił instalator nowej wersji?")
+    if odp:
+        # Instalator kończy program; gdy pobieranie się nie uda, okno się zamyka i program startuje dalej
+        root.wait_window(pobierz_i_zainstaluj(root, link))
+
 def pobierz_i_zainstaluj(root, link):
     okno_pob = tk.Toplevel(root)
     okno_pob.title("Aktualizacja HR")
     okno_pob.geometry("400x180")
-    
+
     root.update_idletasks()
-    x = root.winfo_x() + (root.winfo_width() // 2) - 200
-    y = root.winfo_y() + (root.winfo_height() // 2) - 90
+    if root.winfo_viewable():
+        x = root.winfo_x() + (root.winfo_width() // 2) - 200
+        y = root.winfo_y() + (root.winfo_height() // 2) - 90
+        okno_pob.transient(root)
+    else:
+        # Przed startem okno główne jest ukryte - pobieranie na środku ekranu
+        x = root.winfo_screenwidth() // 2 - 200
+        y = root.winfo_screenheight() // 2 - 90
+        okno_pob.attributes("-topmost", True)
     okno_pob.geometry(f"+{x}+{y}")
-    okno_pob.transient(root)
     okno_pob.grab_set()
 
     lbl = tk.Label(okno_pob, text="Trwa pobieranie aktualizacji...", font=("Arial", 10, "bold"))
@@ -104,6 +132,7 @@ def pobierz_i_zainstaluj(root, link):
             okno_pob.after(0, okno_pob.destroy)
 
     threading.Thread(target=download_thread, daemon=True).start()
+    return okno_pob
 
 def wyslij_zgloszenie_email(email, opis, pliki_zgloszenia, pliki_dodatkowe, okno, btn_wyslij):
     btn_wyslij.config(state="disabled", text="Wysyłanie zgłoszenia. Proszę czekać...")

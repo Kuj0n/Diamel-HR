@@ -4,10 +4,14 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "3.1.1"
-BUILD_DATE = "2026-11-03 11:00"
+VERSION = "3.1.2"
+BUILD_DATE = "2026-11-03 12:00"
 
 CHANGELOG = """
+v3.1.2 (2026-11-03)
+- Aktualizacje sprawdzane przed logowaniem - nowa wersja da się zainstalować nawet wtedy, gdy logowanie nie działa.
+- Przycisk "Sprawdź aktualizacje" w oknie logowania.
+
 v3.1.1 (2026-11-03)
 - Przycisk "Nie pamiętam hasła" w oknie logowania - administrator dostaje prośbę i wysyła link do ustawienia nowego hasła.
 

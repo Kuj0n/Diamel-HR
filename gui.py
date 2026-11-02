@@ -16,7 +16,7 @@ except ImportError:
 # Importy z naszych własnych modułów
 from konfiguracja_app import *
 from obliczenia import zaokraglij_czas, oblicz_roznice_minut, parse_czas_do_minut, formatuj_minuty_do_czasu
-from narzedzia import sprawdz_aktualizacje, wyslij_zgloszenie_email
+from narzedzia import sprawdz_aktualizacje, sprawdz_aktualizacje_przed_startem, wyslij_zgloszenie_email
 from kalendarz import czy_dzien_roboczy
 from serwer_hr import pobierz_dane_pracownikow, wyloguj
 
@@ -61,8 +61,10 @@ class AppHR:
         self.filtry_dzialow_vars = {}
         self.baza_urlopow = {} 
 
-        # Pracownicy, działy i listy zmian z serwera (panel HR na diamel.pl) - nie są wbudowane w program
+        # Najpierw aktualizacja (działa także wtedy, gdy logowanie nie działa), potem pracownicy,
+        # działy i listy zmian z serwera (panel HR na diamel.pl) - nie są wbudowane w program
         self.root.withdraw()
+        sprawdz_aktualizacje_przed_startem(self.root)
         self.dane_serwera = pobierz_dane_pracownikow(self.root) or {}
         self.root.deiconify()
         self.baza_pracownikow = self.dane_serwera.get("pracownicy", {})
@@ -127,8 +129,6 @@ class AppHR:
         self.toggle_wyj_widgets()
         self.toggle_duplikaty_widgets()
         self.toggle_pomylki_widgets()
-        
-        sprawdz_aktualizacje(self.root, tryb="w_tle")
 
     def wyloguj_z_bazy(self):
         if messagebox.askyesno("Wyloguj z bazy pracowników",
