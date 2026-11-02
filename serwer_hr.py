@@ -106,10 +106,30 @@ def okno_logowania(root):
         wynik["token"] = odp["token"]
         okno.destroy()
 
+    def nie_pamietam():
+        if not v_login.get().strip():
+            lbl_blad.config(text="Wpisz swój login, a potem kliknij \"Nie pamiętam hasła\".")
+            e_login.focus_set()
+            return
+        okno.config(cursor="watch"); okno.update()
+        try:
+            odp = zapytanie({"akcja": "przypomnij", "login": v_login.get().strip(), "komputer": platform.node()})
+        except Exception as e:
+            odp = {"ok": False, "blad": f"Brak połączenia z serwerem.\n{e}"}
+        okno.config(cursor="")
+        if odp.get("ok"):
+            messagebox.showinfo("Nie pamiętam hasła",
+                                "Administrator dostał prośbę o reset hasła.\n\n"
+                                "Wkrótce otrzymasz e-mail z linkiem do ustawienia nowego hasła.", parent=okno)
+        else:
+            lbl_blad.config(text=odp.get("blad", "Nie udało się wysłać prośby."))
+
     f_btn = tk.Frame(okno)
-    f_btn.pack(pady=(8, 18))
+    f_btn.pack(pady=(8, 4))
     tk.Button(f_btn, text="Zaloguj", command=zaloguj, bg="#2196F3", fg="white", font=("Arial", 10, "bold"), width=12).pack(side="left", padx=5)
     tk.Button(f_btn, text="Anuluj", command=okno.destroy, width=10).pack(side="left", padx=5)
+    tk.Button(okno, text="Nie pamiętam hasła", command=nie_pamietam, fg="#555555", relief="flat",
+              font=("Arial", 9, "underline"), cursor="hand2").pack(pady=(0, 14))
     okno.bind("<Return>", zaloguj)
     e_login.focus_set()
     root.wait_window(okno)

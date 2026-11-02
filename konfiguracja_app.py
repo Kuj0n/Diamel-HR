@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "3.1.0"
-BUILD_DATE = "2026-11-03 10:00"
+VERSION = "3.1.1"
+BUILD_DATE = "2026-11-03 11:00"
 
 CHANGELOG = """
+v3.1.1 (2026-11-03)
+- Przycisk "Nie pamiętam hasła" w oknie logowania - administrator dostaje prośbę i wysyła link do ustawienia nowego hasła.
+
 v3.1.0 (2026-11-03)
 - Lista pracowników, działy i zmiany pobierane z serwera po zalogowaniu - zawsze aktualne, bez instalowania nowych wersji.
 - Logowanie kontem użytkownika z opcją zapamiętania na komputerze; przycisk "Wyloguj z bazy".
