@@ -572,3 +572,51 @@ class Silnik:
         return ("--- RAPORT NIEPRAWIDŁOWOŚCI RCP ---\n"
                 f"Zarejestrowano nieprawidłowości u {len(linie_raportu)} osób.\nWykryte braki mogły zostać zignorowane lub ręcznie poprawione.\n\n"
                 + "\n".join(linie_raportu))
+
+
+def wczytaj_plan_urlopow(sciezka):
+    """
+    Plan nieobecności z Excela (Comarch) -> {nr pracownika: zbiór dat 'RRRR.MM.DD'}.
+    Logika 1:1 z laduj_urlopy() wersji 3.1.2. Wymaga pandas (+ xlrd dla .xls, openpyxl dla .xlsx).
+    """
+    import pandas as pd
+    df = pd.read_excel(sciezka, header=None)
+    baza_urlopow = {}
+    last_emp_id = None
+    
+    col_od = None
+    col_do = None
+    for col in df.columns:
+        for val in df[col].head(30):
+            val_str = str(val).strip().upper()
+            if val_str == 'OD DNIA':
+                col_od = col
+            elif val_str == 'DO DNIA':
+                col_do = col
+    
+    if col_od is None or col_do is None:
+        col_od, col_do = 6, 9 
+    
+    for idx, row in df.iterrows():
+        col0 = str(row[0]) if pd.notna(row[0]) else ''
+        match = re.search(r'\[(\d+)\]', col0)
+        if match:
+            last_emp_id = match.group(1).zfill(4)
+        
+        v_od = row.get(col_od)
+        v_do = row.get(col_do)
+        
+        if pd.notna(v_od) and pd.notna(v_do) and last_emp_id:
+            try:
+                od_dnia = pd.to_datetime(v_od)
+                do_dnia = pd.to_datetime(v_do)
+                if od_dnia.year >= 2000:
+                    date_range = pd.date_range(od_dnia, do_dnia)
+                    if last_emp_id not in baza_urlopow:
+                        baza_urlopow[last_emp_id] = set()
+                    for d in date_range:
+                        baza_urlopow[last_emp_id].add(d.strftime("%Y.%m.%d"))
+            except:
+                pass
+                
+    return baza_urlopow

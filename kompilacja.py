@@ -9,8 +9,9 @@ import shutil
 # z serwera po zalogowaniu (serwer_hr.py), więc instalator może być publiczny.
 folder_zasoby = "Zasoby"
 
-plik_glowny = "Korektor_logow.py"
-pliki_modulow = ["gui.py", "obliczenia.py", "narzedzia.py", "kalendarz.py", "serwer_hr.py", "konfiguracja_app.py"]
+plik_glowny = "aplikacja.py"
+pliki_modulow = ["interfejs.py", "silnik.py", "raport_pdf.py", "obliczenia.py", "narzedzia.py", "kalendarz.py", "serwer_hr.py", "konfiguracja_app.py"]
+folder_ui = "ui"  # wygląd okna (HTML/CSS/JS, czcionki) - Edge WebView2 przez pywebview
 
 plik_ikony = os.path.join(folder_zasoby, "ikona.ico")
 
@@ -53,6 +54,7 @@ if os.path.exists(folder_zasoby):
     shutil.copytree(folder_zasoby, os.path.join(folder_archiwum, folder_zasoby), dirs_exist_ok=True)
     
 if os.path.exists(plik_ikony): shutil.copy(plik_ikony, os.path.join(folder_archiwum, "ikona.ico"))
+shutil.copytree(folder_ui, os.path.join(folder_archiwum, folder_ui), dirs_exist_ok=True)
 
 # 2.5 GENEROWANIE PLIKU METADANYCH DLA WINDOWSA
 v_parts = wersja.split('.')
@@ -93,8 +95,9 @@ Główne funkcjonalności:
 - Zaawansowana filtracja podwójnych odbić i anomalii z czytników.
 - Dynamiczne zaokrąglanie wejść i wyjść z logiką godzin ruchomych.
 - Ochrona wypracowanego etatu (7h / 8h) przy zaokrągleniach.
-- Ręczny Menedżer Danych do weryfikacji wpisów w graficznym interfejsie.
-- Generowanie szczegółowych raportów braków odbić dla działu HR.
+- Lista do sprawdzenia z propozycjami poprawek i korektą dnia jednym kliknięciem.
+- Reguły firmowe wspólne dla wszystkich komputerów (panel HR na diamel.pl).
+- Raport braków odbić w TXT i PDF (pod drukarkę czarno-białą).
 
 =========================================
  HISTORIA ZMIAN:
@@ -112,6 +115,9 @@ komenda_pyinstaller = (
     f'python -m PyInstaller --onedir --noconsole --clean '
     f'--icon="ikona.ico" --add-data "ikona.ico;." '
     f'--add-data "{folder_zasoby};{folder_zasoby}" '
+    f'--add-data "{folder_ui};{folder_ui}" '
+    f'--collect-all webview --collect-all clr_loader --collect-all pythonnet --hidden-import clr '
+    f'--hidden-import fpdf --hidden-import xlrd --hidden-import openpyxl '
     f'--version-file="wersja_info.txt" '
     f'--hidden-import="ctypes" --collect-all ctypes '
     f'-n "{nazwa_stala}" "{plik_glowny}"'

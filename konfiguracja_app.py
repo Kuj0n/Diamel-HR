@@ -186,7 +186,8 @@ def sciezka_do_zasobu(relatywna_sciezka):
     """ Pancerna funkcja szukająca plików zasobów w trybie .exe i developerskim """
     katalogi = [
         os.path.abspath("."),
-        os.path.join(os.path.abspath("."), "_internal")
+        os.path.join(os.path.abspath("."), "_internal"),
+        os.path.dirname(os.path.abspath(__file__)),
     ]
     if hasattr(sys, '_MEIPASS'):
         katalogi.insert(0, sys._MEIPASS)
