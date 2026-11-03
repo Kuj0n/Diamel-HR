@@ -34,6 +34,9 @@ HISTORIA_MAX = 50
 # chk_raport (zawsze Menedżer danych) w nowym oknie nie ma znaczenia - lista do sprawdzenia jest zawsze widoczna
 NIE_REGULY = set(LISTY_ZMIAN) | {"chk_raport"}
 
+KODY_KROTKO = {"00": "wejście", "16": "wyjście", "18": "przerwa", "25": "przepustka"}
+PULS_SEKUNDY = 120  # sygnał "program otwarty" dla panelu HR (Status -> Teraz)
+
 USTAWIENIA_PROGRAMU = {
     "motyw": "system",          # jasny / ciemny / system
     "rozmiar": "normalny",      # maly / normalny / duzy
@@ -179,6 +182,7 @@ class Api:
             return {"ok": False, "zaloguj": bool(odp.get("zaloguj")), "blad": odp.get("blad", "")}
         self._token = token
         self.dane_serwera = odp
+        self._start_puls()
         self.reguly_firmowe = {k: v for k, v in (odp.get("reguly") or {}).items() if k in DOMYSLNE and k not in NIE_REGULY}
         self.reguly_wersja = odp.get("reguly_wersja", "")
         # Zmiany lokalne równe regułom firmowym przestają być zmianami
@@ -187,6 +191,34 @@ class Api:
             self._zapisz_ustawienia()
         return {"ok": True, "pracownikow": len(odp.get("pracownicy", {})), "wersja_bazy": odp.get("wersja", ""),
                 "login": odp.get("login") or self.program.get("login", ""), "reguly_wersja": self.reguly_wersja}
+
+    def _start_puls(self):
+        """Co 2 minuty informuje serwer, że program jest otwarty (panel HR pokazuje "sesja otwarta")."""
+        if getattr(self, "_puls", None):
+            return
+        self._puls = threading.Event()
+
+        def watek():
+            while not self._puls.is_set():
+                token = getattr(self, "_token", None)
+                if token:
+                    try:
+                        serwer_hr.zapytanie({"akcja": "obecnosc", "token": token, "otwarta": True}, timeout=10.0)
+                    except Exception:
+                        pass
+                self._puls.wait(PULS_SEKUNDY)
+        threading.Thread(target=watek, daemon=True).start()
+
+    def zakoncz_sesje(self):
+        """Przy zamknięciu okna: sesja w panelu od razu jako zamknięta (bez czekania 5 minut)."""
+        if getattr(self, "_puls", None):
+            self._puls.set()
+        token = getattr(self, "_token", None)
+        if token:
+            try:
+                serwer_hr.zapytanie({"akcja": "obecnosc", "token": token, "otwarta": False}, timeout=3.0)
+            except Exception:
+                pass
 
     def wyloguj(self):
         serwer_hr.wyloguj()
@@ -501,7 +533,11 @@ class Api:
         return tresc
 
     def _zapisz_pdf(self, sciezka, pomijane=()):
-        raport_pdf.zapisz(sciezka, anomalie=[a for a in self.anomalie if a["rodzaj"] != "nieobecnosc"],
+        def odbicia(a):
+            zd = self.silnik.dane_do_zapisu.get((a["data"], a["pracownik"]), [])
+            return " · ".join(f"{KODY_KROTKO.get(z['kod'], z['kod'])} {format_czas_gui(z['czas'])}"
+                              + (f" (RCP {format_czas_gui(z['czas_oryg'])})" if z.get("czas_oryg") not in (None, "", "---", z["czas"]) else "") for z in zd)
+        raport_pdf.zapisz(sciezka, anomalie=[{**a, "odbicia": odbicia(a)} for a in self.anomalie if a["rodzaj"] != "nieobecnosc"],
                           statystyki=self._statystyki(), plik=os.path.basename(self.plik_rcp), uzytkownik=self.dane_serwera.get("login") or self.program.get("login", ""),
                           wersja=VERSION, reguly=self.reguly_aktualne(), podpisy=self.program["pdf_podpisy"],
                           kratki=self.program["pdf_kratki"], pominiete=sorted(pomijane), nazwiska=self.silnik.baza_pracownikow,
@@ -509,15 +545,14 @@ class Api:
         return sciezka
 
     def eksport_raportu(self, format_):
+        """Raport zapisywany od razu w folderze zapisu (domyślnie obok pliku z RCP): <plik>_RAPORT_BRAKOW_<n>.<txt|pdf>."""
         if not self.silnik:
             return {"ok": False, "blad": "Najpierw wczytaj plik RCP."}
+        folder = self.program["folder_zapisu"] or os.path.dirname(self.plik_rcp)
         rdzen = os.path.splitext(os.path.basename(self.plik_rcp))[0]
-        domyslna = f"{rdzen}_RAPORT.{format_}"
-        wynik = self.okno.create_file_dialog(webview.FileDialog.SAVE, directory=self.program["folder_zapisu"] or os.path.dirname(self.plik_rcp),
-                                             save_filename=domyslna, file_types=(f"Raport (*.{format_})",))
-        if not wynik:
-            return {"ok": False, "anulowano": True}
-        sciezka = wynik if isinstance(wynik, str) else wynik[0]
+        n = 1
+        while os.path.exists(sciezka := os.path.join(folder, f"{rdzen}_RAPORT_BRAKOW_{n}.{format_}")):
+            n += 1
         if format_ == "pdf":
             self._zapisz_pdf(sciezka)
         else:

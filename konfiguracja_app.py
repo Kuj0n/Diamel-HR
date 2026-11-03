@@ -4,10 +4,19 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "3.1.2"
-BUILD_DATE = "2026-11-03 12:00"
+VERSION = "4.0.0"
+BUILD_DATE = "2026-11-03 21:00"
 
 CHANGELOG = """
+v4.0.0 (2026-11-03)
+- Całkowicie nowy wygląd: pulpit z listą do sprawdzenia, motyw jasny / ciemny / jak w Windows.
+- Korekta dnia w panelu z boku zamiast Menedżera danych: oś dnia, gotowe propozycje poprawek, "Zatwierdź i następny" (Enter).
+- Przed zapisem pliku ERP pytanie o niesprawdzone pozycje: wróć, zapisz wszystko albo pomiń dni z błędami.
+- Reguły firmowe z panelu HR - takie same na wszystkich komputerach; zmiana u siebie widoczna jako lokalna, można ją zaproponować jako firmową.
+- Raport braków także w PDF (pod drukarkę czarno-białą, z odbiciami danego dnia i kratkami do odhaczania).
+- Filtry (rodzaj problemu, działy, wyszukiwanie), skróty klawiszowe, przeciąganie plików na okno, historia przetworzeń.
+- Ręczne korekty zostają po ponownym przetworzeniu i po zmianie reguł.
+
 v3.1.2 (2026-11-03)
 - Aktualizacje sprawdzane przed logowaniem - nowa wersja da się zainstalować nawet wtedy, gdy logowanie nie działa.
 - Przycisk "Sprawdź aktualizacje" w oknie logowania.

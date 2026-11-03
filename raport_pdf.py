@@ -167,9 +167,12 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, reguly, podp
         for i, a in enumerate(pozycje):
             blad = a["rodzaj"] == "blad"
             problem = a["uwaga"].replace("Ostrzeżenie: ", "")
+            odbicia = a.get("odbicia") or "brak odbić"
             pdf.set_font("txt", "B" if blad else "I", 8)
             linie = max(1, len(pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L", dry_run=True, output="LINES")))
-            h = 4 * linie + 1.6
+            pdf.set_font("txt", "", 7)
+            linie_odb = len(pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L", dry_run=True, output="LINES"))
+            h = 4 * linie + 3.3 * linie_odb + 2
             if pdf.get_y() + h > 279:
                 pdf.add_page()
                 naglowek_tabeli()
@@ -193,6 +196,11 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, reguly, podp
             pdf.set_font("txt", "B" if blad else "I", 8)
             pdf.set_xy(x, y + 0.8)
             pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L")
+            pdf.set_font("txt", "", 7)
+            pdf.set_text_color(40)
+            pdf.set_x(x)
+            pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L")
+            pdf.set_text_color(0)
             x += KOLUMNY[5][1]
             if kratki:
                 pdf.set_line_width(0.25)

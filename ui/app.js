@@ -42,7 +42,7 @@ const ik = (n, kl = '') => `<svg class="ik ${kl}" viewBox="0 0 24 24">${IK[n]}</
 // ------------------------------------------------------------------ stan okna
 let INFO = {}, STAN = null, REG = null, KONTO = null, AKT = null, PRACOWNICY = [], WPISY = [];
 let widok = 'pulpit';
-const filtr = { rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie']), dzial: '', szukaj: '', ukryjSprawdzone: false, sort: '' };
+const filtr = { rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie']), dzialy: new Set(), szukaj: '', ukryjSprawdzone: false, sort: '' };
 let wybranyId = null;
 let szuflada = null;   // { d: dane dnia z Pythona, z: zdarzenia w edycji, kolejka: lista id }
 let przeliczTimer = null;
@@ -237,7 +237,7 @@ function pokaz(w) {
   $('#pasek-prawe').innerHTML = '';
   ({ pulpit: rysujPulpit, reguly: rysujReguly, wpisy: rysujWpisy, historia: rysujHistorie, ustawienia: rysujUstawienia, zglos: rysujZgloszenie })[w]();
 }
-$$('.poz').forEach((p) => p.addEventListener('click', () => pokaz(p.dataset.widok)));
+$$('.poz').forEach((p) => p.addEventListener('click', async () => { if (await moznaOpuscicDzien()) { zamknijSzuflade(); pokaz(p.dataset.widok); } }));
 $$('#motyw button').forEach((b) => b.addEventListener('click', () => zmienProgram('motyw', b.dataset.motyw).then(() => widok === 'ustawienia' && rysujUstawienia())));
 
 function nowyStan(s) {
@@ -278,7 +278,7 @@ function tagi(uwaga) {
 
 function widoczneAnomalie() {
   const q = filtr.szukaj.trim().toLowerCase();
-  let l = (STAN?.anomalie || []).filter((a) => filtr.rodzaje.has(a.rodzaj) && (!filtr.dzial || a.dzial === filtr.dzial)
+  let l = (STAN?.anomalie || []).filter((a) => filtr.rodzaje.has(a.rodzaj) && (!filtr.dzialy.size || filtr.dzialy.has(a.dzial))
     && (!filtr.ukryjSprawdzone || !a.status) && (!q || a.pracownik.includes(q) || a.nazwisko.toLowerCase().includes(q) || a.uwaga.toLowerCase().includes(q) || dataKr(a.data).includes(q)));
   if (filtr.sort) {
     const [pole, kier] = filtr.sort.split(':');
@@ -337,9 +337,9 @@ function rysujPulpit() {
     <section class="karta lista">
       <div class="naglowek">
         <h3>Do sprawdzenia</h3>
-        <div class="filtry">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
+        <div class="filtry">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''} ${licz(r) ? '' : 'zero'}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
         <div class="szukaj">
-          <select class="pole" id="f-dzial"><option value="">Wszystkie działy</option>${s.dzialy.map((d) => `<option ${d === filtr.dzial ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+          <div class="rozwijane" id="f-dzialy"><button class="pole" id="f-dzialy-przycisk">${opisDzialow(s.dzialy)}</button></div>
           <input class="pole" id="f-szukaj" placeholder="Szukaj…  (Ctrl+F)" value="${esc(filtr.szukaj)}" style="width:230px">
           <button class="znacznik ${filtr.ukryjSprawdzone ? 'akt' : ''}" id="f-sprawdzone" title="Ukryj sprawdzone">${ik('ok')} Ukryj gotowe</button>
         </div>
@@ -368,10 +368,37 @@ function rysujPulpit() {
   $('#p-pdf')?.addEventListener('click', () => eksport('pdf'));
   $('#p-txt')?.addEventListener('click', () => eksport('txt'));
   $$('[data-rodzaj]').forEach((b) => b.onclick = () => { filtr.rodzaje.has(b.dataset.rodzaj) ? filtr.rodzaje.delete(b.dataset.rodzaj) : filtr.rodzaje.add(b.dataset.rodzaj); b.classList.toggle('akt'); rysujListe(); });
-  $('#f-dzial').onchange = (e) => { filtr.dzial = e.target.value; rysujListe(); };
+  $('#f-dzialy-przycisk').onclick = (e) => { e.stopPropagation(); przelaczListeDzialow(s); };
   $('#f-szukaj').oninput = (e) => { filtr.szukaj = e.target.value; rysujListe(); };
   $('#f-sprawdzone').onclick = (e) => { filtr.ukryjSprawdzone = !filtr.ukryjSprawdzone; e.currentTarget.classList.toggle('akt'); rysujListe(); };
 }
+
+function opisDzialow(wszystkie) {
+  const n = [...filtr.dzialy].filter((d) => wszystkie.includes(d)).length;
+  return !n || n === wszystkie.length ? 'Wszystkie działy' : n === 1 ? esc([...filtr.dzialy].find((d) => wszystkie.includes(d))) : `Działy: ${n} z ${wszystkie.length}`;
+}
+
+function przelaczListeDzialow(s) {
+  const box = $('#f-dzialy');
+  const otwarta = $('.panel-listy', box);
+  if (otwarta) return otwarta.remove();
+  const ile = (d) => s.anomalie.filter((a) => a.dzial === d && filtr.rodzaje.has(a.rodzaj)).length;
+  const panel = document.createElement('div');
+  panel.className = 'panel-listy';
+  panel.innerHTML = `<div class="gora-listy"><button class="btn btn-maly" data-dz="wszystkie">Wszystkie</button><button class="btn btn-maly btn-bez" data-dz="zaden">Odznacz</button></div>
+    ${s.dzialy.map((d) => `<label><input type="checkbox" value="${esc(d)}" ${!filtr.dzialy.size || filtr.dzialy.has(d) ? 'checked' : ''}>${esc(d)}<small>${ile(d)}</small></label>`).join('')}`;
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  const zastosuj = () => {
+    const zazn = $$('input', panel).filter((c) => c.checked).map((c) => c.value);
+    filtr.dzialy = zazn.length === s.dzialy.length ? new Set() : new Set(zazn.length ? zazn : ['\u0000']);
+    $('#f-dzialy-przycisk').innerHTML = zazn.length ? opisDzialow(s.dzialy) : 'Żaden dział';
+    rysujListe();
+  };
+  $$('input', panel).forEach((c) => c.onchange = zastosuj);
+  $$('[data-dz]', panel).forEach((b) => b.onclick = () => { $$('input', panel).forEach((c) => c.checked = b.dataset.dz === 'wszystkie'); zastosuj(); });
+  box.append(panel);
+}
+document.addEventListener('click', () => $('#f-dzialy .panel-listy')?.remove());
 
 function rysujListe() {
   const box = $('#lista-przewijana');
@@ -409,7 +436,8 @@ const doMin = (c) => { const [g, m] = c.split(':').map(Number); return g * 60 + 
 const zMin = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const naWidok = (c) => { const [g, m] = c.split(':').map(Number); return { hm: `${String(g % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`, plus1: g >= 24 }; };
 
-async function otworzDzien(id, kolejka = null) {
+async function otworzDzien(id, kolejka = null, sprawdz = true) {
+  if (sprawdz && szuflada && szuflada.d.id !== id && !(await moznaOpuscicDzien())) return;
   const d = await api('dzien', id);
   if (!d) return;
   wybranyId = id;
@@ -420,6 +448,53 @@ async function otworzDzien(id, kolejka = null) {
 }
 
 function zamknijSzuflade() { szuflada = null; $('#szuflada-miejsce').innerHTML = ''; }
+
+// Przed zamknięciem panelu albo przejściem do innego dnia: zmiany nie mogą zniknąć bez pytania.
+// Zwraca true, gdy można iść dalej (zapisano albo porzucono), false = zostań w edycji.
+async function moznaOpuscicDzien() {
+  if (!szuflada) return true;
+  $$('.zdarz[data-i]').forEach((w) => w.czytaj?.());
+  if (!zmienione()) return true;
+  const w = await modal({
+    tytul: `${ik('uwaga')} Niezapisane zmiany`,
+    tresc: `<p>W dniu <b>${esc(szuflada.d.nazwisko)}</b> (${dataKr(szuflada.d.data)}) są zmiany, które nie zostały zapisane.</p>`,
+    przyciski: [{ tekst: 'Wróć do edycji', wartosc: null, domyslny: true }, { tekst: 'Porzuć zmiany', klasa: 'btn-czerwony', wartosc: 'porzuc' },
+      { tekst: 'Zapisz zmiany', klasa: 'btn-hr', wartosc: 'zapisz' }],
+  });
+  if (w === 'zapisz') {
+    if (!$$('.zdarz[data-i]').every((r) => r.czytaj())) { toast('Popraw godzinę w formacie GG:MM.', 'blad'); return false; }
+    const s = await api('zapisz_dzien', szuflada.d.id, szuflada.z, 'sprawdzone');
+    if (!s) return false;
+    nowyStan(s);
+    return true;
+  }
+  return w === 'porzuc';
+}
+async function zamknijSzufladePytaj() { if (await moznaOpuscicDzien()) zamknijSzuflade(); }
+
+// Godziny zmiany z typu zmiany ('Zmiana 1', 'Sztywna 06:00-14:00') albo null (godziny ruchome)
+function godzinyZmiany(typ) {
+  const zm = { 'Zmiana 1': ['06:00', '14:00'], 'Zmiana 2': ['14:00', '22:00'] }[typ] || (String(typ).startsWith('Sztywna ') ? typ.slice(8).split('-') : null);
+  return zm ? [doMin(zm[0]), zm[1] === '00:00' ? 1440 : doMin(zm[1])] : null;
+}
+
+// Nowe zdarzenie w sensownym miejscu: brak wejścia -> wejście przed pierwszym wyjściem, brak wyjścia -> wyjście po ostatnim wejściu
+function noweZdarzenie(z, d) {
+  const zm = godzinyZmiany(d.typ_zmiany);
+  const wej = z.filter((e) => e.kod === '00'), wyj = z.filter((e) => e.kod === '16' || e.kod === '25');
+  if (!z.length) return { czas: zMin(zm ? zm[0] : 360), kod: '00', czas_oryg: '' };
+  if (!wej.length && wyj.length) {
+    const pierwsze = doMin(wyj[0].czas);
+    return { czas: zMin(zm && zm[0] < pierwsze ? zm[0] : Math.max(0, pierwsze - d.wymiar)), kod: '00', czas_oryg: '' };
+  }
+  const ost = z[z.length - 1];
+  if (ost.kod === '00') {
+    const od = doMin(ost.czas);
+    return { czas: zMin(zm && zm[1] > od ? zm[1] : od + d.wymiar), kod: '16', czas_oryg: '' };
+  }
+  return { czas: zMin(Math.min(doMin(ost.czas) + 30, 47 * 60)), kod: '00', czas_oryg: '' };
+}
+const sortujZdarzenia = (z) => z.sort((a, b) => doMin(a.czas) - doMin(b.czas));
 
 function zmienione() {
   const a = JSON.stringify(szuflada.d.zdarzenia.map((z) => [z.czas, z.kod]));
@@ -432,8 +507,8 @@ function rysujOs(zd, d) {
   const skala = Math.ceil(koniec / 360) * 360;
   const proc = (m) => `${(100 * m / skala).toFixed(2)}%`;
   let html = '';
-  const zm = { 'Zmiana 1': ['06:00', '14:00'], 'Zmiana 2': ['14:00', '22:00'] }[d.typ_zmiany] || (d.typ_zmiany.startsWith('Sztywna ') ? d.typ_zmiany.slice(8).split('-') : null);
-  if (zm) { const od = doMin(zm[0]), dok = zm[1] === '00:00' ? 1440 : doMin(zm[1]); html += `<div class="zmiana" style="left:${proc(od)}; width:${proc(dok - od)}" title="Zmiana ${zm.join('-')}"></div>`; }
+  const zm = godzinyZmiany(d.typ_zmiany);
+  if (zm) html += `<div class="zmiana" style="left:${proc(zm[0])}; width:${proc(zm[1] - zm[0])}" title="Zmiana ${zMin(zm[0])}-${zMin(zm[1] % 1440)}"></div>`;
   let wej = null;
   const posort = [...zd].sort((a, b) => doMin(a.czas) - doMin(b.czas));
   for (const z of posort) {
@@ -476,11 +551,13 @@ function rysujSzuflade() {
               <label class="plus1" title="Po północy (następny dzień)"><input type="checkbox" data-pole="plus1" ${w.plus1 ? 'checked' : ''}>+1d</label>
               <div style="display:flex; align-items:center; gap:8px; min-width:0"><select class="pole" data-pole="kod">${Object.entries(KODY).map(([k, n]) => `<option value="${k}" ${k === e.kod ? 'selected' : ''}>${n} (${k})</option>`).join('')}</select>
                 <span class="oryg">${e.czas_oryg && e.czas_oryg !== e.czas ? `z RCP ${naWidok(e.czas_oryg).hm}` : e.czas_oryg ? '' : 'dodane'}</span></div>
+              <span class="przesun"><button class="btn btn-bez" data-gora="${i}" ${i ? '' : 'disabled'} title="Zamień z wyższym (rodzaj zdarzenia)">▲</button><button class="btn btn-bez" data-dol="${i}" ${i < z.length - 1 ? '' : 'disabled'} title="Zamień z niższym (rodzaj zdarzenia)">▼</button></span>
               <button class="btn btn-ikona btn-bez btn-czerwony" data-usun="${i}" title="Usuń zdarzenie">${ik('kosz')}</button></div>`;
           }).join('')}
-          ${d.propozycje.map((p, i) => `<div class="zdarz propozycja"><span>${ik('info')} <b>Propozycja:</b> ${esc(p.opis)}</span><button class="btn btn-hr btn-maly" data-prop="${i}">Zastosuj</button></div>`).join('')}
+          ${(zmienione() ? [] : d.propozycje).map((p, i) => `<div class="zdarz propozycja"><span>${ik('info')} <b>Propozycja:</b> ${esc(p.opis)}</span><button class="btn btn-hr btn-maly" data-prop="${i}">Zastosuj</button></div>`).join('')}
         </div>
         <button class="btn btn-maly" id="sz-dodaj">${ik('plus')} Dodaj zdarzenie (wejście, wyjście, przerwa, przepustka)</button>
+        <div class="podp" style="margin-top:-6px">Zdarzenia układają się same według godziny - po zmianie godziny wpis przesuwa się na właściwe miejsce. ▲▼ zamienia rodzaje zdarzeń z sąsiednim wpisem.</div>
         ${d.reczna ? `<button class="btn btn-maly btn-bez" id="sz-cofnij">${ik('wstecz')} Cofnij ręczną korektę (wróć do wyniku z reguł)</button>` : ''}
       </div>
       <div class="stopka-szuflady">
@@ -488,12 +565,21 @@ function rysujSzuflade() {
         <button class="btn btn-hr" style="flex:2" id="sz-zatwierdz" title="Enter">${zmienione() ? 'Zapisz zmiany i następny' : 'Zatwierdź i następny'} ${ik('dalej')}</button>
       </div>
     </aside>`;
-  $('#sz-tlo').onclick = zamknijSzuflade;
-  $('#sz-zamknij').onclick = zamknijSzuflade;
-  $('#sz-pomin').onclick = () => nastepny(false);
+  $('#sz-tlo').onclick = zamknijSzufladePytaj;
+  $('#sz-zamknij').onclick = zamknijSzufladePytaj;
+  $('#sz-pomin').onclick = async () => { if (await moznaOpuscicDzien()) nastepny(false); };
   $('#sz-zatwierdz').onclick = zatwierdzDzien;
-  $('#sz-dodaj').onclick = () => { const ost = z.length ? doMin(z[z.length - 1].czas) : 360; z.push({ czas: zMin(Math.min(ost + 60, 1439)), kod: z.length && z[z.length - 1].kod === '00' ? '16' : '00', czas_oryg: '' }); rysujSzuflade(); $$('.zdarz input[data-pole="czas"]').pop()?.select(); };
-  $('#sz-cofnij')?.addEventListener('click', async () => { nowyStan(await api('cofnij_reczna', d.id)); otworzDzien(d.id, szuflada.kolejka); });
+  $('#sz-dodaj').onclick = () => {
+    const nowe = noweZdarzenie(z, d);
+    z.push(nowe);
+    sortujZdarzenia(z);
+    rysujSzuflade();
+    $(`.zdarz[data-i="${z.indexOf(nowe)}"] input[data-pole="czas"]`)?.select();
+  };
+  const zamien = (i, j) => { const k = z[i].kod; z[i].kod = z[j].kod; z[j].kod = k; rysujSzuflade(); };
+  $$('[data-gora]').forEach((b) => b.onclick = () => zamien(+b.dataset.gora, +b.dataset.gora - 1));
+  $$('[data-dol]').forEach((b) => b.onclick = () => zamien(+b.dataset.dol, +b.dataset.dol + 1));
+  $('#sz-cofnij')?.addEventListener('click', async () => { nowyStan(await api('cofnij_reczna', d.id)); otworzDzien(d.id, szuflada.kolejka, false); });
   $$('[data-usun]').forEach((b) => b.onclick = () => { z.splice(+b.dataset.usun, 1); rysujSzuflade(); });
   $$('[data-prop]').forEach((b) => b.onclick = () => {
     const p = d.propozycje[+b.dataset.prop];
@@ -515,9 +601,16 @@ function rysujSzuflade() {
       z[i].kod = $('[data-pole="kod"]', w).value;
       return true;
     };
-    $('[data-pole="czas"]', w).addEventListener('change', () => czytaj() && rysujSzuflade());
-    $('[data-pole="plus1"]', w).addEventListener('change', () => czytaj() && rysujSzuflade());
-    $('[data-pole="kod"]', w).addEventListener('change', () => czytaj() && rysujSzuflade());
+    const poZmianie = () => {
+      if (!czytaj()) return;
+      const e = z[i];
+      sortujZdarzenia(z);
+      rysujSzuflade();
+      $(`.zdarz[data-i="${z.indexOf(e)}"]`)?.animate([{ background: 'color-mix(in srgb, var(--kolor-2) 25%, transparent)' }, {}], 700);
+    };
+    $('[data-pole="czas"]', w).addEventListener('change', poZmianie);
+    $('[data-pole="plus1"]', w).addEventListener('change', poZmianie);
+    $('[data-pole="kod"]', w).addEventListener('change', poZmianie);
     w.czytaj = czytaj;
   });
 }
@@ -538,7 +631,7 @@ function nastepny(poZatwierdzeniu) {
   const status = new Map(STAN.anomalie.map((a) => [a.id, a.status]));
   const od = kolejka.indexOf(d.id);
   const dalej = [...kolejka.slice(od + 1), ...kolejka.slice(0, Math.max(od, 0))].find((id) => status.has(id) && !status.get(id));
-  if (dalej) return otworzDzien(dalej, kolejka.includes(dalej) && widoczneAnomalie().some((a) => a.id === dalej) ? null : kolejka);
+  if (dalej) return otworzDzien(dalej, kolejka.includes(dalej) && widoczneAnomalie().some((a) => a.id === dalej) ? null : kolejka, false);
   zamknijSzuflade();
   if (poZatwierdzeniu) toast('Wszystkie pozycje z listy są sprawdzone. Możesz zapisać plik dla ERP.', 'ok', { tekst: 'Zapisz', fn: () => zapiszErp() });
 }
@@ -581,7 +674,7 @@ async function zapiszErp(tryb = null) {
       tresc: `<p>Na liście są jeszcze <b>${r.bledy} błędów</b> i <b>${r.ostrzezenia} ostrzeżeń</b> (np. niepełne godziny), których nie oznaczono jako sprawdzone.</p>
         <div class="wybor">
           <button class="domyslny" data-wybor="wroc"><b>Wróć do listy</b><span>Popraw pozostałe pozycje przed zapisem (zalecane).</span></button>
-          <button data-wybor="wszystko"><b>Zapisz z niepoprawionymi wpisami</b><span>Plik ERP zawiera wszystkie dni, także te z błędami - jak w poprzednich wersjach.</span></button>
+          <button data-wybor="wszystko"><b>Zapisz z niepoprawionymi wpisami</b><span>Plik zawiera wszystkie wpisy - również te błędne.</span></button>
           ${r.bledy ? `<button data-wybor="pomin"><b>Pomiń niepoprawione dni</b><span>${r.bledy} dni z błędami nie trafi do pliku ERP - zostaną wypisane w raporcie, do uzupełnienia w ERP ręcznie.</span></button>` : ''}
         </div>`,
     });
@@ -591,13 +684,13 @@ async function zapiszErp(tryb = null) {
   }
   if (!r.ok) return toast(esc(r.blad), 'blad');
   const nazwy = r.pliki.map((p) => esc(p.split(/[\\/]/).pop()));
-  toast(`Zapisano: <b>${nazwy[0]}</b>${nazwy.length > 1 ? `<br><span class="podp">oraz ${nazwy.slice(1).join(', ')}</span>` : ''}${r.pominieto ? `<br>Pominięto dni z błędami: ${r.pominieto}` : ''}`,
+  toast(`Zapisano: <b>${nazwy[0]}</b>${nazwy.length > 1 ? `<br><span class="podp">oraz ${nazwy.slice(1).join(', ')}</span>` : ''}<br><span class="podp">w folderze ${esc(r.pliki[0].replace(/[\\/][^\\/]*$/, ''))}</span>${r.pominieto ? `<br>Pominięto dni z błędami: ${r.pominieto}` : ''}`,
     'ok', INFO.program.otworz_folder ? null : { tekst: 'Pokaż w folderze', fn: () => api('otworz_folder', r.pliki[0]) }, 9000);
 }
 
 async function eksport(format) {
   const r = await api('eksport_raportu', format);
-  if (r?.ok) toast(`Zapisano raport ${format.toUpperCase()}.`, 'ok');
+  if (r?.ok) toast(`Zapisano raport <b>${esc(r.plik.split(/[\\/]/).pop())}</b><br><span class="podp">${esc(r.plik.replace(/[\\/][^\\/]*$/, ''))}</span>`, 'ok', { tekst: 'Pokaż w folderze', fn: () => api('otworz_folder', r.plik) }, 8000);
   else if (r && !r.anulowano) toast(esc(r.blad), 'blad');
 }
 
@@ -884,7 +977,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); return zapiszErp(); }
   if (e.key === 'F5') { e.preventDefault(); return STAN?.rcp && przetworz(); }
   if (szuflada) {
-    if (e.key === 'Escape') return zamknijSzuflade();
+    if (e.key === 'Escape') return zamknijSzufladePytaj();
     if (e.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON' && document.activeElement?.tagName !== 'TEXTAREA') {
       e.preventDefault();
       document.activeElement?.blur?.();

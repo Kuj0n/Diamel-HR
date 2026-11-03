@@ -43,6 +43,7 @@ def main():
         okno.dom.document.events.drop += DOMEventHandler(upuszczono, True, True)
 
     def zamykanie():
+        api.zakoncz_sesje()
         try:
             os.makedirs(KATALOG_DANYCH, exist_ok=True)
             json.dump({"w": okno.width, "h": okno.height, "max": False}, open(PLIK_OKNA, "w", encoding="utf-8"))
