@@ -112,7 +112,7 @@ with open(plik_info_txt, "w", encoding="utf-8") as f: f.write(tresc_info)
 print(f"⏳ Kompilacja struktury programu dla wersji {wersja}...")
 # PyInstaller pakuje do srodka cały folder "Zasoby"
 komenda_pyinstaller = (
-    f'python -m PyInstaller --onedir --noconsole --clean '
+    f'python -m PyInstaller --onedir --noconsole --clean --noconfirm '
     f'--icon="ikona.ico" --add-data "ikona.ico;." '
     f'--add-data "{folder_zasoby};{folder_zasoby}" '
     f'--add-data "{folder_ui};{folder_ui}" '
