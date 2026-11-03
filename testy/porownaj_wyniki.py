@@ -7,7 +7,9 @@ W folderze testy/dane_prywatne/ (poza repozytorium - dane osobowe):
   - ustawienia:       settings_v*.json (z folderu programu, zapisane przy generowaniu wzorców)
   - lista pracowników: pracownicy_*.txt (panel HR -> Kopie -> Pobierz kopię)
 
-Użycie: python testy/porownaj_wyniki.py      (kod wyjścia 0 = wyniki identyczne)
+Użycie: python testy/porownaj_wyniki.py         silnik obliczeń (silnik.py)
+        python testy/porownaj_wyniki.py --gui   stary program z oknami (gui.py)
+Kod wyjścia 0 = wyniki identyczne ze wzorcem.
 Wypisuje tylko liczby i numery linii - bez nazwisk pracowników.
 """
 import glob
@@ -59,6 +61,29 @@ def porownaj(nazwa, wzorzec, wynik, dowolna_kolejnosc=False):
     return False
 
 
+def test_silnika(zrodla, ustawienia, dane):
+    """Ten sam test dla silnik.py (obliczenia bez okien) - wyniki zapisywane jak w programie."""
+    import json
+    from silnik import Silnik
+    u = json.load(open(ustawienia, encoding="utf-8"))
+    ok = True
+    roboczy = tempfile.mkdtemp(prefix="hr_silnik_")
+    try:
+        for zrodlo in zrodla:
+            nazwa = os.path.splitext(os.path.basename(zrodlo))[0]
+            print(f"\n{nazwa} (silnik)")
+            s = Silnik(u, dane)
+            _, _, linie_raportu = s.przetworz(open(zrodlo, encoding="utf-8").readlines())
+            wyniki = {"poprawione": s.tresc_pliku_erp(), "RAPORT_BRAKOW": Silnik.tresc_raportu_brakow(linie_raportu)}
+            for rodzaj, tresc in wyniki.items():
+                wynik = os.path.join(roboczy, f"{nazwa}_{rodzaj}.txt")
+                open(wynik, "w", encoding="utf-8").write(tresc)
+                ok &= porownaj(rodzaj, os.path.join(DANE, f"{nazwa}_{rodzaj}_1.txt"), wynik, dowolna_kolejnosc=(rodzaj == "RAPORT_BRAKOW"))
+    finally:
+        shutil.rmtree(roboczy, ignore_errors=True)
+    return ok
+
+
 def main():
     import gui
     ustawienia = sorted(glob.glob(os.path.join(DANE, "settings_v*.json")))
@@ -68,6 +93,11 @@ def main():
         sys.exit(f"Brak danych w {DANE}: potrzebne settings_v*.json, pracownicy_*.txt i pliki RCP")
 
     dane = dane_z_kopii_panelu(kopie[-1])
+    if "--gui" not in sys.argv:
+        print(f"Silnik obliczeń | ustawienia {os.path.basename(ustawienia[-1])} | pracownicy z {os.path.basename(kopie[-1])}")
+        ok = test_silnika(zrodla, ustawienia[-1], dane)
+        print("\nWYNIK:", "wszystkie pliki identyczne ze wzorcem" if ok else "są różnice")
+        return 0 if ok else 1
     gui.sprawdz_aktualizacje_przed_startem = lambda root: None
     gui.pobierz_dane_pracownikow = lambda root: dane
     gui.messagebox.showinfo = gui.messagebox.showwarning = lambda *a, **k: None
