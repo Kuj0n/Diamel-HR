@@ -16,7 +16,7 @@ logging.getLogger("fontTools").setLevel(logging.ERROR)  # Segoe UI: niegroźne k
 
 CZCIONKI = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
 # Problem + odbicia z dnia, Poprawka = miejsce na ręczny wpis (co wprowadzić w ERP), OK = kratka po wprowadzeniu
-KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 34), ("Zmiana", 16), ("Problem", 57), ("Poprawka", 38), ("OK", 6)]
+KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 25), ("Zmiana", 16), ("Problem", 66), ("Poprawka", 38), ("OK", 6)]
 
 
 def _data(d):
@@ -177,10 +177,17 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             komorki = [("txt", "B", 8.5, "X" if blad else "!", "C"), ("mono", "", 7.8, _data(a["data"]), ""),
                        ("mono", "", 7.8, a["pracownik"], ""), ("txt", "", 8, a["nazwisko"], ""),
                        ("txt", "", 8, _zmiana(a["typ_zmiany"]), "")]
-            for (font, styl, rozmiar, tekst, wyr), (_, w) in zip(komorki, KOLUMNY):
+            for nr_kol, ((font, styl, rozmiar, tekst, wyr), (_, w)) in enumerate(zip(komorki, KOLUMNY)):
                 pdf.set_font(font, styl, rozmiar)
                 pdf.set_xy(x, y + 0.8)
-                pdf.cell(w, 4, pdf_skroc(pdf, tekst, w - 1), align=wyr or "L")
+                if nr_kol == 3:
+                    # Nazwisko w pierwszej linijce, imię (reszta) w drugiej - węższa kolumna, więcej miejsca na problem
+                    nazwisko, _, imie = str(tekst).partition(" ")
+                    pdf.cell(w, 4, pdf_skroc(pdf, nazwisko, w - 1))
+                    pdf.set_xy(x, y + 4.6)
+                    pdf.cell(w, 4, pdf_skroc(pdf, imie, w - 1))
+                else:
+                    pdf.cell(w, 4, pdf_skroc(pdf, tekst, w - 1), align=wyr or "L")
                 x += w
             pdf.set_font("txt", "B" if blad else "I", 8)
             pdf.set_xy(x, y + 0.8)
