@@ -171,8 +171,11 @@ class Api:
             return {"ok": False, "blad": f"Brak połączenia z serwerem: {e}"}
         return {"ok": bool(odp.get("ok")), "blad": odp.get("blad", "")}
 
-    def pobierz_dane(self):
-        """Lista pracowników, działy, zmiany i reguły firmowe z serwera. {'ok', 'zaloguj': True gdy trzeba się zalogować}."""
+    def pobierz_dane(self, pracownicy=True, reguly=True):
+        """
+        Lista pracowników (z działami i zmianami) i/lub reguły firmowe z serwera. {'ok', 'zaloguj': True gdy trzeba się zalogować}.
+        Przy odświeżaniu z ustawień można pobrać tylko jedno z nich - 'zmiany' opisuje, co się zmieniło.
+        """
         token = getattr(self, "_token", None) or serwer_hr.wczytaj_token()
         if not token:
             return {"ok": False, "zaloguj": True}
@@ -185,16 +188,29 @@ class Api:
             self._token = None
             return {"ok": False, "zaloguj": bool(odp.get("zaloguj")), "blad": odp.get("blad", "")}
         self._token = token
-        self.dane_serwera = odp
         self._start_puls()
-        self.reguly_firmowe = {k: v for k, v in (odp.get("reguly") or {}).items() if k in DOMYSLNE and k not in NIE_REGULY}
-        self.reguly_wersja = odp.get("reguly_wersja", "")
+        zmiany = {}
+        if pracownicy or not self.dane_serwera:
+            stara, nowa = self.dane_serwera.get("pracownicy", {}), odp.get("pracownicy", {})
+            zmiany["pracownicy"] = {"bylo": len(stara), "jest": len(nowa), "wersja": odp.get("wersja", ""),
+                                    "dodani": len(set(nowa) - set(stara)), "usunieci": len(set(stara) - set(nowa)),
+                                    "zmienieni": sum(1 for n in set(nowa) & set(stara) if nowa[n] != stara[n]
+                                                     or odp.get("dzialy", {}).get(n) != self.dane_serwera.get("dzialy", {}).get(n)),
+                                    "bez_zmian": stara == nowa and odp.get("dzialy") == self.dane_serwera.get("dzialy")
+                                                 and odp.get("listy") == self.dane_serwera.get("listy") and odp.get("ignorowani") == self.dane_serwera.get("ignorowani")}
+            self.dane_serwera = {**odp, "reguly": self.dane_serwera.get("reguly", odp.get("reguly")) if not reguly else odp.get("reguly")}
+        if reguly:
+            nowe = {k: v for k, v in (odp.get("reguly") or {}).items() if k in DOMYSLNE and k not in NIE_REGULY}
+            zmiany["reguly"] = {"bylo": self.reguly_wersja, "jest": odp.get("reguly_wersja", ""), "na_serwerze": bool(nowe),
+                                "zmienionych": sum(1 for k in set(nowe) | set(self.reguly_firmowe) if nowe.get(k) != self.reguly_firmowe.get(k))}
+            self.reguly_firmowe = nowe
+            self.reguly_wersja = odp.get("reguly_wersja", "")
         # Zmiany lokalne równe regułom firmowym przestają być zmianami
         if self.reguly_firmowe:
             self.reguly_lokalne = {k: v for k, v in self.reguly_lokalne.items() if self.reguly_firmowe.get(k, DOMYSLNE[k]) != v}
             self._zapisz_ustawienia()
-        return {"ok": True, "pracownikow": len(odp.get("pracownicy", {})), "wersja_bazy": odp.get("wersja", ""),
-                "login": odp.get("login") or self.program.get("login", ""), "reguly_wersja": self.reguly_wersja}
+        return {"ok": True, "pracownikow": len(self.dane_serwera.get("pracownicy", {})), "wersja_bazy": self.dane_serwera.get("wersja", ""),
+                "login": odp.get("login") or self.program.get("login", ""), "reguly_wersja": self.reguly_wersja, "zmiany": zmiany}
 
     def _start_puls(self):
         """Co 2 minuty informuje serwer, że program jest otwarty (panel HR pokazuje "sesja otwarta")."""

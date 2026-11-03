@@ -939,8 +939,29 @@ function rysujUstawienia() {
   $('#u-folder').onclick = async () => { INFO.program = await api('wybierz_folder_zapisu'); rysujUstawienia(); };
   $('#u-folder-dom')?.addEventListener('click', async () => { await zmienProgram('folder_zapisu', ''); rysujUstawienia(); });
   $('#u-odswiez')?.addEventListener('click', async () => {
-    const d = await api('pobierz_dane');
-    if (d?.ok) { KONTO = d; REG = await api('reguly'); PRACOWNICY = (await api('pracownicy')) || []; odswiezDol(); rysujUstawienia(); toast('Pobrano aktualne dane z serwera.', 'ok'); if (STAN?.rcp) nowyStan(await api('przetworz')); }
+    const w = await modal({
+      tytul: `${ik('odswiez')} Odśwież dane z serwera`,
+      tresc: `<p>Co pobrać z panelu HR na diamel.pl?</p>
+        <div class="lista-wyboru">
+          <label><input type="checkbox" id="o-prac" checked><span style="flex:1"><b style="font-weight:600">Baza pracowników</b><br><span class="podp">nazwiska, działy, przypisania zmian, niepracujący · teraz: ${liczba(KONTO.pracownikow)} osób${KONTO.wersja_bazy ? `, stan z ${esc(KONTO.wersja_bazy)}` : ''}</span></span></label>
+          <label><input type="checkbox" id="o-reg" checked><span style="flex:1"><b style="font-weight:600">Reguły firmowe</b><br><span class="podp">zaokrąglanie, duplikaty, nadgodziny, ignorowani · teraz: ${REG.sa_firmowe ? esc(REG.wersja || 'tak') : 'brak - reguły domyślne'}</span></span></label>
+        </div>${Object.keys(REG.lokalne).length ? `<p class="podp" style="margin-top:10px">Twoje zmiany lokalne reguł (${Object.keys(REG.lokalne).length}) zostają - nadal mają pierwszeństwo przed firmowymi.</p>` : ''}`,
+      przyciski: [{ tekst: 'Anuluj', wartosc: null }, { tekst: `${ik('pobierz')} Pobierz`, klasa: 'btn-hr', wartosc: 'tak', domyslny: true }],
+      poOtwarciu: (el) => { window._odswiez = el; },
+    });
+    if (w !== 'tak') return;
+    const prac = $('#o-prac', window._odswiez).checked, reg = $('#o-reg', window._odswiez).checked;
+    if (!prac && !reg) return toast('Nic nie zaznaczono - dane bez zmian.');
+    const d = await api('pobierz_dane', prac, reg);
+    if (d?.ok) {
+      KONTO = d; REG = await api('reguly'); PRACOWNICY = (await api('pracownicy')) || []; odswiezDol(); rysujUstawienia();
+      const opis = [];
+      const p = d.zmiany.pracownicy, r = d.zmiany.reguly;
+      if (p) opis.push(`<b>Baza pracowników:</b> ${p.bez_zmian ? `bez zmian (${liczba(p.jest)} osób)` : `${liczba(p.bylo)} → ${liczba(p.jest)} osób${p.dodani ? `, nowi: ${p.dodani}` : ''}${p.usunieci ? `, usunięci: ${p.usunieci}` : ''}${p.zmienieni ? `, zmienieni: ${p.zmienieni}` : ''}`}`);
+      if (r) opis.push(`<b>Reguły firmowe:</b> ${!r.na_serwerze ? 'na serwerze nie ma reguł firmowych - działają reguły domyślne' : !r.zmienionych ? `bez zmian (${esc(r.jest)})` : `${esc(r.bylo || 'brak')} → ${esc(r.jest)}, zmienionych ustawień: ${r.zmienionych}`}`);
+      toast(opis.join('<br>'), r && !r.na_serwerze ? '' : 'ok', null, 10000);
+      if (STAN?.rcp && ((p && !p.bez_zmian) || (r && r.zmienionych))) { nowyStan(await api('przetworz')); toast('Plik przeliczono ponownie z nowymi danymi (ręczne korekty zostały).', 'ok'); }
+    }
     else if (d?.zaloguj) ekranLogowania('Sesja wygasła - zaloguj się ponownie.');
     else toast(esc(d?.blad || 'Nie udało się pobrać danych.'), 'blad');
   });
