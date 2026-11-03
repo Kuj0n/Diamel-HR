@@ -80,7 +80,7 @@ def rodzaj_uwagi(uwaga):
 
 class Api:
     def __init__(self):
-        self.okno = None
+        self._okno = None
         self.dane_serwera = {}
         self.reguly_firmowe = {}
         self.reguly_wersja = ""
@@ -95,7 +95,7 @@ class Api:
         self.linie_rcp = []
         self.plik_urlopow = ""
         self.urlopy = {}
-        self.silnik = None
+        self._silnik = None
         self.reczne = {}      # (data, nr) -> lista zdarzeń poprawionych ręcznie (zachowane przy ponownym przetworzeniu)
         self.statusy = {}     # (data, nr) -> 'sprawdzone' / 'pominiete'
         self.anomalie = []
@@ -127,15 +127,15 @@ class Api:
         cel = os.path.join(tempfile.gettempdir(), "Aktualizacja_HR_Instalator.exe")
 
         def postep(bloki, rozmiar_bloku, calosc):
-            if calosc > 0 and self.okno:
-                self.okno.evaluate_js(f"window.postepAktualizacji && window.postepAktualizacji({min(100, int(bloki * rozmiar_bloku * 100 / calosc))})")
+            if calosc > 0 and self._okno:
+                self._okno.evaluate_js(f"window.postepAktualizacji && window.postepAktualizacji({min(100, int(bloki * rozmiar_bloku * 100 / calosc))})")
 
         def watek():
             try:
                 urllib.request.urlretrieve(link, cel, postep)
-                self.okno.evaluate_js("window.aktualizacjaPobrana(true, '')")
+                self._okno.evaluate_js("window.aktualizacjaPobrana(true, '')")
             except Exception as e:
-                self.okno.evaluate_js(f"window.aktualizacjaPobrana(false, {json.dumps(str(e))})")
+                self._okno.evaluate_js(f"window.aktualizacjaPobrana(false, {json.dumps(str(e))})")
         threading.Thread(target=watek, daemon=True).start()
         return {"ok": True}
 
@@ -238,7 +238,7 @@ class Api:
         return self.program
 
     def wybierz_folder_zapisu(self):
-        wynik = self.okno.create_file_dialog(webview.FileDialog.FOLDER)
+        wynik = self._okno.create_file_dialog(webview.FileDialog.FOLDER)
         if wynik:
             self.ustaw_program("folder_zapisu", wynik[0])
         return self.program
@@ -290,11 +290,11 @@ class Api:
     # ------------------------------------------------------------------ pliki
 
     def wybierz_plik_rcp(self):
-        wynik = self.okno.create_file_dialog(webview.FileDialog.OPEN, file_types=("Pliki RCP (*.txt)",))
+        wynik = self._okno.create_file_dialog(webview.FileDialog.OPEN, file_types=("Pliki RCP (*.txt)",))
         return self.wczytaj_plik(wynik[0]) if wynik else None
 
     def wybierz_plik_urlopow(self):
-        wynik = self.okno.create_file_dialog(webview.FileDialog.OPEN, file_types=("Plan nieobecności (*.xls;*.xlsx)",))
+        wynik = self._okno.create_file_dialog(webview.FileDialog.OPEN, file_types=("Plan nieobecności (*.xls;*.xlsx)",))
         return self.wczytaj_plik(wynik[0]) if wynik else None
 
     def wczytaj_plik(self, sciezka):
@@ -332,13 +332,13 @@ class Api:
         s.przetworz(self.linie_rcp)
         for klucz, zdarzenia in self.reczne.items():
             s.dane_do_zapisu[klucz] = [dict(z) for z in zdarzenia]
-        self.silnik = s
+        self._silnik = s
         self._odswiez_anomalie()
         self._zapisz_historie()
         return self.stan()
 
     def _odswiez_anomalie(self):
-        wpisy, _, self.linie_raportu = self.silnik.generuj_raporty()
+        wpisy, _, self.linie_raportu = self._silnik.generuj_raporty()
         self.anomalie = []
         for w in wpisy:
             klucz = (w["data"], w["pracownik"])
@@ -347,7 +347,7 @@ class Api:
 
     def _statystyki(self):
         zrodlo = [l for l in self.linie_rcp if len(l.strip().split(";")) == 3]
-        wynik = [z for zdarzenia in self.silnik.dane_do_zapisu.values() for z in zdarzenia] if self.silnik else []
+        wynik = [z for zdarzenia in self._silnik.dane_do_zapisu.values() for z in zdarzenia] if self._silnik else []
         zmienione = sum(1 for z in wynik if z.get("czas_oryg") != z["czas"])
         daty = sorted({l[:10] for l in zrodlo})
         licz = lambda r: sum(1 for a in self.anomalie if a["rodzaj"] == r)
@@ -368,7 +368,7 @@ class Api:
         rcp = {"sciezka": self.plik_rcp, "nazwa": os.path.basename(self.plik_rcp)} if self.plik_rcp else None
         urlopy = ({"sciezka": self.plik_urlopow, "nazwa": os.path.basename(self.plik_urlopow),
                    "pracownikow": len(self.urlopy), "dni": sum(len(v) for v in self.urlopy.values())} if self.plik_urlopow else None)
-        return {"ok": True, "rcp": rcp, "urlopy": urlopy, "statystyki": self._statystyki() if self.silnik else None,
+        return {"ok": True, "rcp": rcp, "urlopy": urlopy, "statystyki": self._statystyki() if self._silnik else None,
                 "anomalie": self.anomalie, "reczne": len(self.reczne), "zmienione_reguly": len(self.reguly_lokalne),
                 "dzialy": sorted({a["dzial"] for a in self.anomalie})}
 
@@ -380,7 +380,7 @@ class Api:
 
     def dzien(self, id_):
         klucz = self._klucz(id_)
-        s = self.silnik
+        s = self._silnik
         zdarzenia = [dict(z) for z in s.dane_do_zapisu.get(klucz, [])]
         ctx = s.kontekst_pracownikow.get(klucz, {})
         anomalia = next((a for a in self.anomalie if a["id"] == id_), None)
@@ -434,12 +434,12 @@ class Api:
     def zapisz_dzien(self, id_, zdarzenia, status="sprawdzone"):
         """Ręczna korekta dnia: zdarzenia [{czas 'HH:MM' (24+ = po północy), kod}] w kolejności czasu."""
         klucz = self._klucz(id_)
-        oryginal = {(z["czas"], z["kod"]): z.get("czas_oryg", z["czas"]) for z in self.silnik.dane_do_zapisu.get(klucz, [])}
+        oryginal = {(z["czas"], z["kod"]): z.get("czas_oryg", z["czas"]) for z in self._silnik.dane_do_zapisu.get(klucz, [])}
         nowe = []
         for z in sorted(zdarzenia, key=lambda z: parse_czas_do_minut(z["czas"])):
             nowe.append({"czas": z["czas"], "kod": z["kod"], "czas_oryg": oryginal.get((z["czas"], z["kod"]), z.get("czas_oryg") or z["czas"])})
         self.reczne[klucz] = nowe
-        self.silnik.dane_do_zapisu[klucz] = [dict(z) for z in nowe]
+        self._silnik.dane_do_zapisu[klucz] = [dict(z) for z in nowe]
         if status:
             self.statusy[klucz] = status
         self._odswiez_anomalie()
@@ -464,13 +464,13 @@ class Api:
     def dodaj_zdarzenie(self, nr, data, czas, kod):
         """Zdarzenie w dniu, którego nie ma na liście (np. pracownik bez odbić)."""
         klucz = (data, nr)
-        if not self.silnik:
+        if not self._silnik:
             return {"ok": False, "blad": "Najpierw wczytaj plik RCP."}
-        lista = [dict(z) for z in self.silnik.dane_do_zapisu.get(klucz, [])] + [{"czas": czas, "kod": kod, "czas_oryg": czas}]
+        lista = [dict(z) for z in self._silnik.dane_do_zapisu.get(klucz, [])] + [{"czas": czas, "kod": kod, "czas_oryg": czas}]
         return self.zapisz_dzien(f"{data}|{nr}", lista)
 
     def pracownicy(self):
-        s = self.silnik
+        s = self._silnik
         nr = set(s.baza_pracownikow) | {p for _, p in s.dane_do_zapisu} if s else set(self.dane_serwera.get("pracownicy", {}))
         baza = self.dane_serwera.get("pracownicy", {})
         return [{"nr": n, "nazwisko": baza.get(n, "---")} for n in sorted(nr)]
@@ -480,7 +480,7 @@ class Api:
 
     def wpisy(self, nr=None, data=None):
         """Wszystkie wpisy (jak 'Wszystkie wpisy' w Menedżerze danych) - filtr po pracowniku i/lub dniu."""
-        s = self.silnik
+        s = self._silnik
         if not s:
             return []
         wynik = []
@@ -501,18 +501,18 @@ class Api:
         tryb None: gdy zostały niesprawdzone pozycje -> {'pytanie': ...} (okno wyboru w programie).
         tryb 'wszystko': zapis z niepoprawionymi wpisami; 'pomin': bez dni z niepoprawionymi błędami.
         """
-        if not self.silnik:
+        if not self._silnik:
             return {"ok": False, "blad": "Najpierw wczytaj plik RCP."}
         niesprawdzone = [a for a in self.anomalie if a["rodzaj"] != "nieobecnosc" and not a["status"]]
         if tryb is None and niesprawdzone:
             return {"ok": False, "pytanie": True, "bledy": sum(1 for a in niesprawdzone if a["rodzaj"] == "blad"),
                     "ostrzezenia": sum(1 for a in niesprawdzone if a["rodzaj"] != "blad")}
         pomijane = self._do_pominiecia() if tryb == "pomin" else set()
-        dane = {k: v for k, v in self.silnik.dane_do_zapisu.items() if k not in pomijane}
+        dane = {k: v for k, v in self._silnik.dane_do_zapisu.items() if k not in pomijane}
         folder = self.program["folder_zapisu"] or os.path.dirname(self.plik_rcp)
-        path_wynik, path_raport = self.silnik.generuj_nazwy_plikow(os.path.join(folder, os.path.basename(self.plik_rcp)))
+        path_wynik, path_raport = self._silnik.generuj_nazwy_plikow(os.path.join(folder, os.path.basename(self.plik_rcp)))
         with open(path_wynik, "w", encoding="utf-8") as f:
-            f.write(self.silnik.tresc_pliku_erp(dane))
+            f.write(self._silnik.tresc_pliku_erp(dane))
         zapisane = [path_wynik]
         if self.program["eksport_txt"] and self.linie_raportu:
             with open(path_raport, "w", encoding="utf-8") as f:
@@ -529,24 +529,24 @@ class Api:
         tresc = Silnik.tresc_raportu_brakow(self.linie_raportu)
         if pomijane:
             tresc += "\n\n--- POMINIĘTE W PLIKU ERP (niepoprawione błędy) ---\n" + "\n".join(
-                f"{d} | Pracownik {p} ({self.silnik.baza_pracownikow.get(p, '---')})" for d, p in sorted(pomijane))
+                f"{d} | Pracownik {p} ({self._silnik.baza_pracownikow.get(p, '---')})" for d, p in sorted(pomijane))
         return tresc
 
     def _zapisz_pdf(self, sciezka, pomijane=()):
         def odbicia(a):
-            zd = self.silnik.dane_do_zapisu.get((a["data"], a["pracownik"]), [])
+            zd = self._silnik.dane_do_zapisu.get((a["data"], a["pracownik"]), [])
             return " · ".join(f"{KODY_KROTKO.get(z['kod'], z['kod'])} {format_czas_gui(z['czas'])}"
                               + (f" (RCP {format_czas_gui(z['czas_oryg'])})" if z.get("czas_oryg") not in (None, "", "---", z["czas"]) else "") for z in zd)
         raport_pdf.zapisz(sciezka, anomalie=[{**a, "odbicia": odbicia(a)} for a in self.anomalie if a["rodzaj"] != "nieobecnosc"],
                           statystyki=self._statystyki(), plik=os.path.basename(self.plik_rcp), uzytkownik=self.dane_serwera.get("login") or self.program.get("login", ""),
                           wersja=VERSION, podpisy=self.program["pdf_podpisy"],
-                          kratki=self.program["pdf_kratki"], pominiete=sorted(pomijane), nazwiska=self.silnik.baza_pracownikow,
+                          kratki=self.program["pdf_kratki"], pominiete=sorted(pomijane), nazwiska=self._silnik.baza_pracownikow,
                           nieobecnosci=sum(1 for a in self.anomalie if a["rodzaj"] == "nieobecnosc"))
         return sciezka
 
     def eksport_raportu(self, format_):
         """Raport zapisywany od razu w folderze zapisu (domyślnie obok pliku z RCP): <plik>_RAPORT_BRAKOW_<n>.<txt|pdf>."""
-        if not self.silnik:
+        if not self._silnik:
             return {"ok": False, "blad": "Najpierw wczytaj plik RCP."}
         folder = self.program["folder_zapisu"] or os.path.dirname(self.plik_rcp)
         rdzen = os.path.splitext(os.path.basename(self.plik_rcp))[0]
@@ -576,7 +576,7 @@ class Api:
     # ------------------------------------------------------------------ historia przetworzeń
 
     def _zapisz_historie(self, zapisane=None, pominieto=None):
-        if not self.silnik:
+        if not self._silnik:
             return
         historia = _czytaj_json(PLIK_HISTORII, [])
         st = self._statystyki()
@@ -607,7 +607,7 @@ class Api:
     # ------------------------------------------------------------------ zgłoszenie błędu
 
     def wybierz_zalaczniki(self):
-        wynik = self.okno.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+        wynik = self._okno.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return list(wynik or [])
 
     def zglos_blad(self, email, opis, dolacz_pliki, dodatkowe):

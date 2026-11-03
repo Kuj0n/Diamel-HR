@@ -28,7 +28,7 @@ def main():
         width=okno_poz.get("w", 1400), height=okno_poz.get("h", 900), min_size=(1100, 700),
         maximized=okno_poz.get("max", False), background_color="#0a1530", text_select=True,
     )
-    api.okno = okno
+    api._okno = okno  # z podkreśleniem: pywebview nie udostępnia (i nie przegląda) tego pola dla JS
 
     def upuszczono(e):
         # Pełna ścieżka pliku jest dostępna tylko po stronie Pythona (pywebviewFullPath)
