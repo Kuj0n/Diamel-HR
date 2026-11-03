@@ -113,8 +113,11 @@ textarea.pole { resize: vertical; min-height: 120px; width: 100%; line-height: 1
 /* Rozwijana lista z zaznaczaniem (filtr działów) */
 .rozwijane { position: relative; }
 .rozwijane > .pole { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-width: 190px; justify-content: space-between; }
+.rozwijane.wyrozniony > .pole { border: 1.5px solid var(--kolor-2); background: var(--niebieski-tlo); color: var(--text); font-weight: 600; padding: 7px 12px; }
+.rozwijane.wyrozniony > .pole svg { width: 16px; height: 16px; color: var(--kolor-2); }
+:root[data-motyw="jasny"] .rozwijane.wyrozniony > .pole { border-color: #3b82f6; }
 .rozwijane > .pole::after { content: ''; width: 8px; height: 8px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
-.rozwijane .panel-listy { position: absolute; top: calc(100% + 6px); right: 0; z-index: 15; width: 320px; max-height: 380px; overflow: auto; padding: 8px;
+.rozwijane .panel-listy { position: absolute; top: calc(100% + 6px); left: 0; z-index: 15; width: 320px; max-height: 380px; overflow: auto; padding: 8px;
   background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--cien); }
 .rozwijane .panel-listy label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; cursor: pointer; font-size: 0.9rem; color: var(--text); }
 .rozwijane .panel-listy label:hover { background: var(--hover); }
@@ -250,6 +253,8 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .wiersz .et { color: var(--text-2); display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wiersz .et small { display: block; color: var(--muted); font-size: 0.76rem; }
 .wiersz .wartosci { display: flex; align-items: center; gap: 8px; flex: none; }
+.wiersz.kolumna { flex-direction: column; align-items: stretch; gap: 8px; }
+.wiersz.kolumna .chipy { justify-content: flex-start; max-width: none; }
 .wiersz.wylaczony .wartosci .pole, .wiersz.wylaczony .wartosci .segment { opacity: 0.4; pointer-events: none; }
 .wiersz.lokalna .et::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--zolty); flex: none; box-shadow: 0 0 0 3px var(--zolty-tlo); }
 .przywroc { color: var(--zolty-tekst); background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; }
@@ -339,7 +344,9 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .toast.ok svg { color: var(--kolor); }
 .toast.blad { border-color: var(--czerwony); }
 .toast.blad svg { color: var(--czerwony); }
-.toast .btn { margin-left: 6px; }
+.toast > svg, .toast .btn { flex: none; }
+.toast > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast .btn { margin-left: 4px; align-self: center; }
 
 /* Historia */
 .historia-poz { display: grid; grid-template-columns: 1fr auto; gap: 6px 20px; align-items: center; padding: 14px 20px; }

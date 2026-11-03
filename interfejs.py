@@ -33,6 +33,8 @@ HISTORIA_MAX = 50
 # Reguły, których nie ustawia się w programie: listy zmian przychodzą z panelu HR (lista pracowników),
 # chk_raport (zawsze Menedżer danych) w nowym oknie nie ma znaczenia - lista do sprawdzenia jest zawsze widoczna
 NIE_REGULY = set(LISTY_ZMIAN) | {"chk_raport"}
+# Reguły, które zmienia tylko administrator (panel HR) - bez zmian lokalnych w programie
+TYLKO_ADMIN = {"pracownicy_ignorowani"}
 
 KODY_KROTKO = {"00": "wejście", "16": "wyjście", "18": "przerwa", "25": "przepustka"}
 PULS_SEKUNDY = 120  # sygnał "program otwarty" dla panelu HR (Status -> Teraz)
@@ -86,7 +88,7 @@ class Api:
         self.reguly_wersja = ""
         # Reguły firmowe przychodzą z serwera; tu tylko zmiany lokalne użytkownika i ustawienia programu
         zapis = _czytaj_json(PLIK_USTAWIEN, {})
-        self.reguly_lokalne = zapis.get("reguly_lokalne", {})
+        self.reguly_lokalne = {k: v for k, v in zapis.get("reguly_lokalne", {}).items() if k not in TYLKO_ADMIN}
         self.program = {**USTAWIENIA_PROGRAMU, **zapis.get("program", {})}
         self._wyczysc_sesje()
 
@@ -257,10 +259,11 @@ class Api:
             "sa_firmowe": bool(self.reguly_firmowe),
             "wersja": self.reguly_wersja,
             "listy_z_panelu": {k: aktualne[k] for k in LISTY_ZMIAN},
+            "niepracujacy_z_panelu": self.dane_serwera.get("ignorowani", ""),
         }
 
     def zmien_regule(self, klucz, wartosc):
-        if klucz in DOMYSLNE and klucz not in NIE_REGULY:
+        if klucz in DOMYSLNE and klucz not in NIE_REGULY and klucz not in TYLKO_ADMIN:
             if {**DOMYSLNE, **self.reguly_firmowe}[klucz] == wartosc:
                 self.reguly_lokalne.pop(klucz, None)
             else:

@@ -337,9 +337,9 @@ function rysujPulpit() {
     <section class="karta lista">
       <div class="naglowek">
         <h3>Do sprawdzenia</h3>
+        <div class="rozwijane wyrozniony" id="f-dzialy"><button class="pole" id="f-dzialy-przycisk">${ik('ludzie')}<span>${opisDzialow(s.dzialy)}</span></button></div>
         <div class="filtry">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''} ${licz(r) ? '' : 'zero'}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
         <div class="szukaj">
-          <div class="rozwijane" id="f-dzialy"><button class="pole" id="f-dzialy-przycisk">${opisDzialow(s.dzialy)}</button></div>
           <input class="pole" id="f-szukaj" placeholder="Szukaj…  (Ctrl+F)" value="${esc(filtr.szukaj)}" style="width:230px">
           <button class="znacznik ${filtr.ukryjSprawdzone ? 'akt' : ''}" id="f-sprawdzone" title="Ukryj sprawdzone">${ik('ok')} Ukryj gotowe</button>
         </div>
@@ -384,14 +384,14 @@ function przelaczListeDzialow(s) {
   if (otwarta) return otwarta.remove();
   const ile = (d) => s.anomalie.filter((a) => a.dzial === d && filtr.rodzaje.has(a.rodzaj)).length;
   const panel = document.createElement('div');
-  panel.className = 'panel-listy';
+  panel.className = 'panel-listy lewa';
   panel.innerHTML = `<div class="gora-listy"><button class="btn btn-maly" data-dz="wszystkie">Wszystkie</button><button class="btn btn-maly btn-bez" data-dz="zaden">Odznacz</button></div>
     ${s.dzialy.map((d) => `<label><input type="checkbox" value="${esc(d)}" ${!filtr.dzialy.size || filtr.dzialy.has(d) ? 'checked' : ''}>${esc(d)}<small>${ile(d)}</small></label>`).join('')}`;
   panel.addEventListener('click', (e) => e.stopPropagation());
   const zastosuj = () => {
     const zazn = $$('input', panel).filter((c) => c.checked).map((c) => c.value);
     filtr.dzialy = zazn.length === s.dzialy.length ? new Set() : new Set(zazn.length ? zazn : ['\u0000']);
-    $('#f-dzialy-przycisk').innerHTML = zazn.length ? opisDzialow(s.dzialy) : 'Żaden dział';
+    $('#f-dzialy-przycisk span').innerHTML = zazn.length ? opisDzialow(s.dzialy) : 'Żaden dział';
     rysujListe();
   };
   $$('input', panel).forEach((c) => c.onchange = zastosuj);
@@ -774,8 +774,8 @@ function rysujReguly() {
     <div class="siatka k3">
       ${KARTY.map((k) => `<section class="karta"><h3>${ik(k.ikona)}${k.tytul}</h3><p class="opis">${k.opis}</p>${k.pola.map(rysujPole).join('')}</section>`).join('')}
       <section class="karta"><h3>${ik('ludzie')}Pracownicy</h3><p class="opis">Przypisania zmian ustawia administrator w panelu HR</p>
-        ${rysujPole({ et: 'Ignorowani', mala: 'bez raportu błędów (+ niepracujący z panelu)', lista: 'pracownicy_ignorowani' })}
-        ${LISTY_PANELU.map(([k, n]) => { const l = numery(REG.listy_z_panelu[k]); return `<div class="wiersz"><span class="et">${n}</span><span class="chipy">${l.length ? l.slice(0, 5).map((x) => `<span class="zablokowane">${esc(x)}</span>`).join('') + (l.length > 5 ? `<span class="zablokowane">+${l.length - 5}</span>` : '') : '<span class="podp">brak</span>'}</span></div>`; }).join('')}
+        ${wierszListy('Ignorowani', 'bez raportu błędów', numery(REG.aktualne.pracownicy_ignorowani), numery(REG.niepracujacy_z_panelu).length)}
+        ${LISTY_PANELU.map(([k, n]) => wierszListy(n, '', numery(REG.listy_z_panelu[k]))).join('')}
       </section>
     </div>`;
   $$('select[data-klucz]', el).forEach((s) => s.onchange = () => zmienRegule(s.dataset.klucz, s.value));
@@ -787,6 +787,14 @@ function rysujReguly() {
     if (w === 'tak') { REG = await api('przywroc_firmowe', null); poZmianieRegul(); }
   });
   $('#r-zaproponuj')?.addEventListener('click', zaproponujReguly);
+}
+
+// Lista numerów tylko do odczytu (zmienia administrator w panelu HR): etykieta nad numerami, żeby nic nie nachodziło
+function wierszListy(nazwa, mala, lista, niepracujacy = 0) {
+  const pokaz = 8;
+  return `<div class="wiersz kolumna"><span class="et"><span>${nazwa}${mala ? ` <small style="display:inline">· ${mala}</small>` : ''}</span></span>
+    <span class="chipy">${lista.slice(0, pokaz).map((x) => `<span class="zablokowane">${esc(x)}</span>`).join('')}${lista.length > pokaz ? `<span class="zablokowane" title="${esc(lista.slice(pokaz).join(', '))}">+${lista.length - pokaz}</span>` : ''}
+      ${niepracujacy ? `<span class="zablokowane" title="Oznaczeni w panelu HR jako niepracujący">+ ${niepracujacy} niepracujących z panelu</span>` : ''}${!lista.length && !niepracujacy ? '<span class="podp">brak</span>' : ''}</span></div>`;
 }
 
 function opisWartosci(k, v) { return typeof v === 'boolean' ? (v ? 'włączone' : 'wyłączone') : k === 'dzialy_wyjatek' || k === 'pracownicy_ignorowani' ? `${numery(v).length} pozycji` : v; }
