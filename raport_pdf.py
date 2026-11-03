@@ -27,22 +27,6 @@ def _zmiana(typ):
     return {"Zmiana 1": "I zmiana", "Zmiana 2": "II zmiana", "godziny ruchome": "ruchome", "---": "-"}.get(typ, typ.replace("Sztywna ", ""))
 
 
-def opis_regul(u):
-    """Krótki opis najważniejszych reguł do stopki (żeby z wydruku było wiadomo, jak liczono)."""
-    czesci = []
-    if u.get("chk_wej"):
-        czesci.append(f"wejścia co {u['wej_minuty']} min ({u['wej_kierunek']}, tol. {u['wej_tol']})")
-    if u.get("chk_wyj"):
-        czesci.append(f"wyjścia co {u['wyj_minuty']} min ({u['wyj_kierunek']}, tol. {u['wyj_tol']})")
-    if u.get("chk_duplikaty"):
-        czesci.append(f"duplikaty < {u['dup_wej_min']}/{u['dup_wyj_min']} min")
-    if u.get("chk_nadgodziny"):
-        czesci.append(f"nadgodziny od {u['nadgodziny_min']} min" + (f" co {u['nadgodziny_skok_min']} min" if u.get("chk_nadgodziny_skok") else ""))
-    if u.get("chk_midnight"):
-        czesci.append(f"północ do {u['midnight_limit']}")
-    return "Reguły: " + ", ".join(czesci) if czesci else ""
-
-
 class _Pdf(FPDF):
     def __init__(self, stopka_lewa):
         super().__init__(format="A4")
@@ -67,13 +51,13 @@ class _Pdf(FPDF):
         self.cell(32, 4, f"Strona {self.page_no()} z {{nb}}", align="R")
 
 
-def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, reguly, podpisy=False, kratki=True,
+def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=False, kratki=True,
            pominiete=(), nazwiska=None, nieobecnosci=0):
     """
     anomalie: lista z interfejs.Api.anomalie (bez nieobecności) - pola data, pracownik, nazwisko, dzial, typ_zmiany, uwaga, rodzaj, status
     pominiete: lista (data, nr) dni wyłączonych z pliku ERP
     """
-    pdf = _Pdf(opis_regul(reguly))
+    pdf = _Pdf(f"Raport braków odbić · {plik}")  # stopka bez reguł - raport trafia też do osób spoza kadr
     pdf.add_page()
 
     # Nagłówek

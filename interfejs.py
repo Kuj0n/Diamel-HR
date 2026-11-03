@@ -539,7 +539,7 @@ class Api:
                               + (f" (RCP {format_czas_gui(z['czas_oryg'])})" if z.get("czas_oryg") not in (None, "", "---", z["czas"]) else "") for z in zd)
         raport_pdf.zapisz(sciezka, anomalie=[{**a, "odbicia": odbicia(a)} for a in self.anomalie if a["rodzaj"] != "nieobecnosc"],
                           statystyki=self._statystyki(), plik=os.path.basename(self.plik_rcp), uzytkownik=self.dane_serwera.get("login") or self.program.get("login", ""),
-                          wersja=VERSION, reguly=self.reguly_aktualne(), podpisy=self.program["pdf_podpisy"],
+                          wersja=VERSION, podpisy=self.program["pdf_podpisy"],
                           kratki=self.program["pdf_kratki"], pominiete=sorted(pomijane), nazwiska=self.silnik.baza_pracownikow,
                           nieobecnosci=sum(1 for a in self.anomalie if a["rodzaj"] == "nieobecnosc"))
         return sciezka
