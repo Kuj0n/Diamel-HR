@@ -360,9 +360,10 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .historia-poz .meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.82rem; }
 .historia-poz .meta span b { color: var(--text-2); font-size: 0.82rem; font-weight: 600; }
 .pliki-wynikowe { grid-column: span 2; border-top: 1px solid var(--linia); padding-top: 8px; }
-.pliki-wynikowe summary { display: inline-flex; align-items: center; gap: 6px; font-size: 0.86rem; color: var(--text-2); }
-.pliki-wynikowe summary svg { width: 15px; height: 15px; color: var(--kolor); transition: transform 0.15s; }
-.pliki-wynikowe[open] summary svg { transform: rotate(45deg); }
+.pliki-wynikowe summary { list-style: none; display: inline-flex; color: var(--text); margin-bottom: 4px; }
+.pliki-wynikowe summary::-webkit-details-marker { display: none; }
+.pliki-wynikowe summary svg { width: 16px; height: 16px; color: var(--kolor); transition: transform 0.15s; }
+.pliki-wynikowe[open] summary svg { transform: rotate(90deg); }
 .pliki-wynikowe .tab td { padding: 6px 8px; }
 .pliki-wynikowe .tab td:first-child { padding-left: 0; }
 .pliki-wynikowe .tab tbody tr { cursor: default; }

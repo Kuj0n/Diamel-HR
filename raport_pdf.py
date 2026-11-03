@@ -16,7 +16,7 @@ logging.getLogger("fontTools").setLevel(logging.ERROR)  # Segoe UI: niegroźne k
 
 CZCIONKI = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
 # Problem + odbicia z dnia, Poprawka = miejsce na ręczny wpis (co wprowadzić w ERP), OK = kratka po wprowadzeniu
-KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 40), ("Zmiana", 20), ("Problem", 58), ("Poprawka", 27), ("OK", 6)]
+KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 34), ("Zmiana", 16), ("Problem", 57), ("Poprawka", 38), ("OK", 6)]
 
 
 def _data(d):
@@ -161,7 +161,7 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             linie = max(1, len(pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L", dry_run=True, output="LINES")))
             pdf.set_font("txt", "", 7)
             linie_odb = len(pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L", dry_run=True, output="LINES"))
-            h = max(9.5, 4 * linie + 3.3 * linie_odb + 2)  # min. wysokość: miejsce na ręczny wpis
+            h = max(13, 4 * linie + 3.3 * linie_odb + 2)  # min. wysokość: dwie linijki na ręczny wpis
             if pdf.get_y() + h > 279:
                 pdf.add_page()
                 naglowek_tabeli()
@@ -194,7 +194,8 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             pdf.set_draw_color(150)
             pdf.set_line_width(0.2)
             pdf.set_dash_pattern(dash=0.8, gap=0.8)
-            pdf.line(x + 1, y + h - 1.8, x + KOLUMNY[6][1] - 2, y + h - 1.8)
+            for linia in (y + h - 7, y + h - 2):
+                pdf.line(x + 1, linia, x + KOLUMNY[6][1] - 2, linia)
             pdf.set_dash_pattern()
             pdf.set_draw_color(0)
             x += KOLUMNY[6][1]
