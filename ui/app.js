@@ -42,7 +42,7 @@ const ik = (n, kl = '') => `<svg class="ik ${kl}" viewBox="0 0 24 24">${IK[n]}</
 // ------------------------------------------------------------------ stan okna
 let INFO = {}, STAN = null, REG = null, KONTO = null, AKT = null, PRACOWNICY = [], WPISY = [];
 let widok = 'pulpit';
-const filtr = { rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie']), dzialy: new Set(), szukaj: '', ukryjSprawdzone: false, sort: '' };
+const filtr = { tryb: 'problemy', rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie', 'nieobecnosc']), dzialy: new Set(), szukaj: '', ukryjSprawdzone: false, sort: '' };
 let wybranyId = null;
 let szuflada = null;   // { d: dane dnia z Pythona, z: zdarzenia w edycji, kolejka: lista id }
 let przeliczTimer = null;
@@ -225,7 +225,7 @@ function odswiezDol() {
 // ------------------------------------------------------------------ nawigacja
 const TYTULY = {
   pulpit: ['Korektor Logów HR', 'Korekta logów czasu pracy'], reguly: ['Ustawienia korekty', 'Reguły korekty'],
-  wpisy: ['Podgląd pliku ERP', 'Wszystkie wpisy'], historia: ['Ostatnio przetwarzane', 'Historia przetworzeń'],
+  historia: ['Ostatnio przetwarzane', 'Historia przetworzeń'],
   ustawienia: ['Program', 'Ustawienia'], zglos: ['Pomoc', 'Zgłoś błąd'],
 };
 function pokaz(w) {
@@ -235,7 +235,7 @@ function pokaz(w) {
   $('#pasek-nad').textContent = TYTULY[w][0];
   $('#pasek-tytul').textContent = TYTULY[w][1];
   $('#pasek-prawe').innerHTML = '';
-  ({ pulpit: rysujPulpit, reguly: rysujReguly, wpisy: rysujWpisy, historia: rysujHistorie, ustawienia: rysujUstawienia, zglos: rysujZgloszenie })[w]();
+  ({ pulpit: rysujPulpit, reguly: rysujReguly, historia: rysujHistorie, ustawienia: rysujUstawienia, zglos: rysujZgloszenie })[w]();
 }
 $$('.poz').forEach((p) => p.addEventListener('click', async () => { if (await moznaOpuscicDzien()) { zamknijSzuflade(); pokaz(p.dataset.widok); } }));
 $$('#motyw button').forEach((b) => b.addEventListener('click', () => zmienProgram('motyw', b.dataset.motyw).then(() => widok === 'ustawienia' && rysujUstawienia())));
@@ -247,7 +247,6 @@ function nowyStan(s) {
   WPISY = [];
   odswiezDol();
   if (widok === 'pulpit') rysujPulpit();
-  if (widok === 'wpisy') rysujWpisy();
 }
 
 // ------------------------------------------------------------------ pliki
@@ -336,12 +335,15 @@ function rysujPulpit() {
     </div>
     <section class="karta lista">
       <div class="naglowek">
-        <h3>Do sprawdzenia</h3>
+        <div class="segment tryb-listy">
+          <button data-tryb="problemy" class="${filtr.tryb === 'problemy' ? 'akt' : ''}">Do sprawdzenia <b>${liczba(st.do_sprawdzenia)}</b></button>
+          <button data-tryb="wszystkie" class="${filtr.tryb === 'wszystkie' ? 'akt' : ''}" title="Wszystkie dni pracy w pliku dla ERP - także bez problemów">Wszystkie wpisy</button>
+        </div>
         <div class="rozwijane wyrozniony" id="f-dzialy"><button class="pole" id="f-dzialy-przycisk">${ik('ludzie')}<span>${opisDzialow(s.dzialy)}</span></button></div>
-        <div class="filtry">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''} ${licz(r) ? '' : 'zero'}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
+        <div class="filtry ${filtr.tryb === 'wszystkie' ? 'ukryty' : ''}">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''} ${licz(r) ? '' : 'zero'}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
         <div class="szukaj">
           <input class="pole" id="f-szukaj" placeholder="Szukaj…  (Ctrl+F)" value="${esc(filtr.szukaj)}" style="width:230px">
-          <button class="znacznik ${filtr.ukryjSprawdzone ? 'akt' : ''}" id="f-sprawdzone" title="Ukryj sprawdzone">${ik('ok')} Ukryj gotowe</button>
+          <button class="znacznik ${filtr.ukryjSprawdzone ? 'akt' : ''} ${filtr.tryb === 'wszystkie' ? 'ukryty' : ''}" id="f-sprawdzone" title="Ukryj sprawdzone">${ik('ok')} Ukryj gotowe</button>
         </div>
       </div>
       <div class="przewijana" id="lista-przewijana"></div>
@@ -349,7 +351,6 @@ function rysujPulpit() {
     <div class="akcje-dol">
       <button class="btn rozciagnij" id="p-przetworz" title="F5">${ik('odswiez')} Przetwórz ponownie z bieżącymi regułami${s.reczne ? ` <span class="podp">(${s.reczne} ${odmiana(s.reczne, 'ręczna korekta zostaje', 'ręczne korekty zostają', 'ręcznych korekt zostaje')})</span>` : ''}</button>
       <button class="btn" id="p-dodaj">${ik('plus')} Dodaj zdarzenie ręcznie</button>
-      <button class="btn" id="p-wpisy">Wszystkie wpisy</button>
     </div>
     <div class="koniec">
       <button class="btn btn-hr duzy" id="p-zapisz" title="Ctrl+S">${ik('pobierz')} Zapisz plik do importu w Comarch ERP XL</button>
@@ -363,7 +364,7 @@ function rysujPulpit() {
   $('#p-urlopy').onclick = wybierzUrlopy;
   $('#p-przetworz').onclick = przetworz;
   $('#p-dodaj').onclick = () => dodajZdarzenieRecznie();
-  $('#p-wpisy').onclick = () => pokaz('wpisy');
+  $$('[data-tryb]').forEach((b) => b.onclick = () => { filtr.tryb = b.dataset.tryb; rysujPulpit(); });
   $('#p-zapisz').onclick = () => zapiszErp();
   $('#p-pdf')?.addEventListener('click', () => eksport('pdf'));
   $('#p-txt')?.addEventListener('click', () => eksport('txt'));
@@ -382,7 +383,7 @@ function przelaczListeDzialow(s) {
   const box = $('#f-dzialy');
   const otwarta = $('.panel-listy', box);
   if (otwarta) return otwarta.remove();
-  const ile = (d) => s.anomalie.filter((a) => a.dzial === d && filtr.rodzaje.has(a.rodzaj)).length;
+  const ile = (d) => (filtr.tryb === 'wszystkie' ? WPISY.filter((w) => w.dzial === d) : s.anomalie.filter((a) => a.dzial === d && filtr.rodzaje.has(a.rodzaj))).length;
   const panel = document.createElement('div');
   panel.className = 'panel-listy lewa';
   panel.innerHTML = `<div class="gora-listy"><button class="btn btn-maly" data-dz="wszystkie">Wszystkie</button><button class="btn btn-maly btn-bez" data-dz="zaden">Odznacz</button></div>
@@ -403,6 +404,7 @@ document.addEventListener('click', () => $('#f-dzialy .panel-listy')?.remove());
 function rysujListe() {
   const box = $('#lista-przewijana');
   if (!box) return;
+  if (filtr.tryb === 'wszystkie') return rysujWszystkieWpisy(box);
   const l = widoczneAnomalie();
   const kol = [['status', ''], ['data', 'Dzień'], ['pracownik', 'Nr'], ['nazwisko', 'Pracownik'], ['dzial', 'Dział'], ['typ_zmiany', 'Zmiana'], ['uwaga', 'Problem']];
   const strz = (p) => filtr.sort.startsWith(p + ':') ? (filtr.sort.endsWith(':d') ? ' ↓' : ' ↑') : '';
@@ -666,6 +668,7 @@ async function dodajZdarzenieRecznie(nr = '', data = '') {
 // ------------------------------------------------------------------ zapis i raporty
 async function zapiszErp(tryb = null) {
   if (!STAN?.rcp) return toast('Najpierw wczytaj plik RCP.');
+  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy]);
   const r = await api('zapisz_erp', tryb);
   if (!r) return;
   if (r.pytanie) {
@@ -689,6 +692,7 @@ async function zapiszErp(tryb = null) {
 }
 
 async function eksport(format) {
+  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy]);
   const r = await api('eksport_raportu', format);
   if (r?.ok) toast(`Zapisano raport <b>${esc(r.plik.split(/[\\/]/).pop())}</b><br><span class="podp">${esc(r.plik.replace(/[\\/][^\\/]*$/, ''))}</span>`, 'ok', { tekst: 'Pokaż w folderze', fn: () => api('otworz_folder', r.plik) }, 8000);
   else if (r && !r.anulowano) toast(esc(r.blad), 'blad');
@@ -774,7 +778,7 @@ function rysujReguly() {
     <div class="siatka k3">
       ${KARTY.map((k) => `<section class="karta"><h3>${ik(k.ikona)}${k.tytul}</h3><p class="opis">${k.opis}</p>${k.pola.map(rysujPole).join('')}</section>`).join('')}
       <section class="karta"><h3>${ik('ludzie')}Pracownicy</h3><p class="opis">Przypisania zmian ustawia administrator w panelu HR</p>
-        ${wierszListy('Ignorowani', 'bez raportu błędów', numery(REG.aktualne.pracownicy_ignorowani), numery(REG.niepracujacy_z_panelu).length)}
+        ${wierszListy('Ignorowani', 'bez raportu błędów', numery(REG.aktualne.pracownicy_ignorowani), numery(REG.niepracujacy_z_panelu).filter((n) => !numery(REG.aktualne.pracownicy_ignorowani).includes(n)))}
         ${LISTY_PANELU.map(([k, n]) => wierszListy(n, '', numery(REG.listy_z_panelu[k]))).join('')}
       </section>
     </div>`;
@@ -789,12 +793,15 @@ function rysujReguly() {
   $('#r-zaproponuj')?.addEventListener('click', zaproponujReguly);
 }
 
-// Lista numerów tylko do odczytu (zmienia administrator w panelu HR): etykieta nad numerami, żeby nic nie nachodziło
-function wierszListy(nazwa, mala, lista, niepracujacy = 0) {
-  const pokaz = 8;
+// Lista numerów tylko do odczytu (zmienia administrator w panelu HR): etykieta nad numerami, nazwisko po najechaniu myszką.
+// Niepracujący z panelu (też pomijani w raporcie) - osobno, do rozwinięcia.
+function wierszListy(nazwa, mala, lista, niepracujacy = []) {
+  const nazwisko = (nr) => PRACOWNICY.find((p) => p.nr === nr)?.nazwisko || '';
+  const chip = (nr, kl = 'zablokowane') => `<span class="${kl}" title="${esc(nazwisko(nr) || 'brak na liście pracowników')}">${esc(nr)}</span>`;
   return `<div class="wiersz kolumna"><span class="et"><span>${nazwa}${mala ? ` <small style="display:inline">· ${mala}</small>` : ''}</span></span>
-    <span class="chipy">${lista.slice(0, pokaz).map((x) => `<span class="zablokowane">${esc(x)}</span>`).join('')}${lista.length > pokaz ? `<span class="zablokowane" title="${esc(lista.slice(pokaz).join(', '))}">+${lista.length - pokaz}</span>` : ''}
-      ${niepracujacy ? `<span class="zablokowane" title="Oznaczeni w panelu HR jako niepracujący">+ ${niepracujacy} niepracujących z panelu</span>` : ''}${!lista.length && !niepracujacy ? '<span class="podp">brak</span>' : ''}</span></div>`;
+    <span class="chipy">${lista.map((nr) => chip(nr)).join('')}${!lista.length ? '<span class="podp">brak</span>' : ''}</span>
+    ${niepracujacy.length ? `<details class="rozwin"><summary>oraz ${niepracujacy.length} ${odmiana(niepracujacy.length, 'osoba oznaczona', 'osoby oznaczone', 'osób oznaczonych')} w panelu HR jako niepracujące</summary>
+      <span class="chipy">${niepracujacy.map((nr) => chip(nr, 'zablokowane przerywane')).join('')}</span></details>` : ''}</div>`;
 }
 
 function opisWartosci(k, v) { return typeof v === 'boolean' ? (v ? 'włączone' : 'wyłączone') : k === 'dzialy_wyjatek' || k === 'pracownicy_ignorowani' ? `${numery(v).length} pozycji` : v; }
@@ -849,32 +856,25 @@ function poZmianieRegul() {
   przeliczTimer = setTimeout(async () => { nowyStan(await api('przetworz')); }, 350);
 }
 
-// ------------------------------------------------------------------ wszystkie wpisy
-async function rysujWpisy() {
-  const el = $('#widok-wpisy');
-  if (!STAN?.rcp) { el.innerHTML = `<div class="pusto">Wczytaj plik RCP, żeby zobaczyć wpisy.</div>`; return; }
-  if (!WPISY.length) WPISY = (await api('wpisy')) || [];
-  const daty = [...new Set(WPISY.map((w) => w.data))].sort();
+// ------------------------------------------------------------------ wszystkie wpisy (tryb listy na ekranie Korekta logów)
+async function rysujWszystkieWpisy(box) {
+  if (!WPISY.length) {
+    box.innerHTML = '<div class="pusto">Wczytywanie…</div>';
+    WPISY = (await api('wpisy')) || [];
+    if (filtr.tryb !== 'wszystkie') return;
+  }
+  const q = filtr.szukaj.trim().toLowerCase();
   const anom = new Map(STAN.anomalie.map((a) => [a.id, a]));
-  el.classList.add('stala');
-  el.innerHTML = `<section class="karta lista">
-      <div class="naglowek"><h3>Plik dla ERP po korekcie</h3><span class="podp">${liczba(WPISY.length)} dni pracy · kliknij wiersz, żeby poprawić</span>
-        <div class="szukaj"><select class="pole" id="w-data"><option value="">Wszystkie dni</option>${daty.map((d) => `<option value="${d}">${dataKr(d)} ${dzienTyg(d)}</option>`).join('')}</select>
-          <input class="pole" id="w-szukaj" placeholder="Nr albo nazwisko…" style="width:220px"></div></div>
-      <div class="przewijana" id="w-lista"></div></section>
-    <div class="akcje-dol"><button class="btn" id="w-dodaj">${ik('plus')} Brak pracownika w logach? Dopisz zdarzenie</button></div>`;
-  const rysuj = () => {
-    const q = $('#w-szukaj').value.trim().toLowerCase(), d = $('#w-data').value;
-    const l = WPISY.filter((w) => (!d || w.data === d) && (!q || w.nr.includes(q) || w.nazwisko.toLowerCase().includes(q))).slice(0, 800);
-    $('#w-lista').innerHTML = l.length ? `<table class="tab"><thead><tr><th>Dzień</th><th>Nr</th><th>Pracownik</th><th>Zdarzenia</th><th>Uwagi</th></tr></thead><tbody>
-      ${l.map((w) => { const a = anom.get(w.id); return `<tr data-id="${esc(w.id)}"><td class="data">${dataKr(w.data)}<small>${dzienTyg(w.data)}</small></td><td class="nr">${esc(w.nr)}</td>
-        <td class="nazwisko">${esc(w.nazwisko)}</td><td class="zdarzenia-wiersz">${esc(w.zdarzenia)}</td><td>${a ? tagi(a.uwaga) : ''}${a?.reczna ? '<span class="tag reczna">ręcznie</span>' : ''}</td></tr>`; }).join('')}</tbody></table>` : '<div class="pusto">Brak wpisów.</div>';
-    $$('#w-lista tbody tr').forEach((tr) => tr.onclick = () => otworzDzien(tr.dataset.id, l.map((w) => w.id)));
-  };
-  $('#w-szukaj').oninput = rysuj;
-  $('#w-data').onchange = rysuj;
-  $('#w-dodaj').onclick = () => dodajZdarzenieRecznie('', $('#w-data').value);
-  rysuj();
+  const l = WPISY.filter((w) => (!filtr.dzialy.size || filtr.dzialy.has(w.dzial))
+    && (!q || w.nr.includes(q) || w.nazwisko.toLowerCase().includes(q) || dataKr(w.data).includes(q) || w.zdarzenia.includes(q)));
+  const pokaz = l.slice(0, 1500);
+  box.innerHTML = l.length ? `<table class="tab"><thead><tr><th>Dzień</th><th>Nr</th><th>Pracownik</th><th>Dział</th><th>Zmiana</th><th>Odbicia (po korekcie)</th><th>Uwagi</th></tr></thead><tbody>
+    ${pokaz.map((w) => { const a = anom.get(w.id); return `<tr data-id="${esc(w.id)}" class="${w.id === wybranyId ? 'wybrany' : ''}"><td class="data">${dataKr(w.data)}<small>${dzienTyg(w.data)}</small></td><td class="nr">${esc(w.nr)}</td>
+      <td class="nazwisko">${esc(w.nazwisko)}</td><td class="dzial" title="${esc(w.dzial)}">${esc(w.dzial)}</td><td class="zmiana">${esc(zmianaKr(w.typ_zmiany))}</td>
+      <td class="zdarzenia-wiersz">${esc(w.zdarzenia)}</td><td>${a ? tagi(a.uwaga) : ''}${a?.reczna ? '<span class="tag reczna">ręcznie</span>' : ''}</td></tr>`; }).join('')}</tbody></table>
+    ${l.length > pokaz.length ? `<div class="pusto">Pokazano ${liczba(pokaz.length)} z ${liczba(l.length)} - zawęź wyszukiwaniem albo działem.</div>` : ''}`
+    : '<div class="pusto">Brak wpisów dla wybranych filtrów.</div>';
+  $$('tbody tr', box).forEach((tr) => tr.onclick = () => otworzDzien(tr.dataset.id, pokaz.map((w) => w.id)));
 }
 
 // ------------------------------------------------------------------ historia
@@ -894,8 +894,14 @@ async function rysujHistorie() {
         <div class="meta"><span>${esc(w.kiedy)}</span><span>okres <b>${esc(w.okres.replaceAll('.', '-'))}</b></span><span>zdarzeń <b>${liczba(w.zdarzen)}</b></span>
           <span>do sprawdzenia <b>${liczba(w.do_sprawdzenia)}</b></span>${w.reczne ? `<span>ręcznych korekt <b>${w.reczne}</b></span>` : ''}
           ${(w.zapisy || []).length ? `<span>zapisano dla ERP <b>${w.zapisy.length}×</b>, ostatnio ${esc(w.zapisy[w.zapisy.length - 1].kiedy)}</span>` : '<span>nie zapisano dla ERP</span>'}</div></div>
-      <div style="display:flex; gap:8px">${(w.zapisy || []).length ? `<button class="btn btn-maly" data-folder="${esc(w.zapisy[w.zapisy.length - 1].pliki[0])}">${ik('folder')} Folder</button>` : ''}
-        ${w.istnieje ? `<button class="btn btn-maly" data-otworz="${esc(w.id)}">Otwórz ponownie</button>` : ''}</div></div>`).join('') || '<div class="pusto">Historia jest pusta.</div>'}`;
+      <div style="display:flex; gap:8px">${w.istnieje ? `<button class="btn btn-maly" data-folder="${esc(w.plik)}">${ik('folder')} Folder</button><button class="btn btn-maly" data-otworz="${esc(w.id)}">Otwórz ponownie</button>` : ''}</div>
+      ${w.pliki.length ? `<details class="rozwin pliki-wynikowe"><summary>${ik('plus')} ${w.pliki.filter((p) => p.rodzaj === 'erp').length} ${odmiana(w.pliki.filter((p) => p.rodzaj === 'erp').length, 'plik poprawiony', 'pliki poprawione', 'plików poprawionych')} dla ERP
+          i ${w.pliki.length - w.pliki.filter((p) => p.rodzaj === 'erp').length} ${odmiana(w.pliki.length - w.pliki.filter((p) => p.rodzaj === 'erp').length, 'raport', 'raporty', 'raportów')} w folderze</summary>
+        <table class="tab"><tbody>${w.pliki.map((p) => `<tr><td><span class="tag ${p.rodzaj === 'erp' ? 'reczna' : 'ostrzezenie'}">${p.rodzaj === 'erp' ? `ERP · wersja ${p.numer}` : `raport ${p.rodzaj.toUpperCase()} · ${p.numer}`}</span></td>
+          <td class="nazwisko">${esc(p.nazwa)}</td><td class="podp">${esc(p.kiedy)}</td><td class="podp">${p.kb} KB</td>
+          <td style="text-align:right; white-space:nowrap"><button class="btn btn-maly" data-plik="${esc(p.sciezka)}">Otwórz</button> <button class="btn btn-maly btn-bez" data-folder="${esc(p.sciezka)}">${ik('folder')}</button></td></tr>`).join('')}</tbody></table></details>`
+      : '<div class="podp" style="grid-column: span 2">Brak zapisanych plików dla ERP w folderze pliku.</div>'}</div>`).join('') || '<div class="pusto">Historia jest pusta.</div>'}`;
+  $$('[data-plik]', el).forEach((b) => b.onclick = async () => { const r = await api('otworz_plik', b.dataset.plik); if (r && !r.ok) toast(esc(r.blad), 'blad'); });
   $$('[data-otworz]', el).forEach((b) => b.onclick = () => otworzZHistorii(b.dataset.otworz));
   $$('[data-folder]', el).forEach((b) => b.onclick = () => api('otworz_folder', b.dataset.folder));
 }
@@ -953,15 +959,23 @@ function rysujUstawienia() {
 let dodatkowe = [];
 function rysujZgloszenie() {
   const el = $('#widok-zglos');
-  const pliki = [STAN?.rcp?.nazwa, STAN?.urlopy?.nazwa].filter(Boolean);
   el.innerHTML = `<section class="karta" style="max-width:820px; display:grid; gap:14px">
     <p class="podp" style="margin:0">Zgłoszenie trafia e-mailem do autora programu. Opisz, co się stało i których pracowników / dni dotyczy.</p>
     <div><label class="etykieta">Twój adres e-mail (do odpowiedzi)</label><input class="pole" id="z-email" style="width:100%" type="email"></div>
     <div><label class="etykieta">Opis problemu</label><textarea class="pole" id="z-opis" placeholder="np. pracownik 0123, 06.10 - program usunął wyjście o 14:02…"></textarea></div>
-    <label class="zaznacz"><input type="checkbox" id="z-pliki" ${pliki.length ? 'checked' : 'disabled'}> Dołącz wczytane pliki ${pliki.length ? `<span class="podp">(${pliki.map(esc).join(', ')})</span>` : '<span class="podp">(brak wczytanych plików)</span>'}</label>
+    <div><label class="etykieta">Załączniki <span id="z-rozmiar"></span></label><div class="lista-wyboru" id="z-zalaczniki" style="margin-top:0"><div class="pusto" style="padding:14px">Wczytaj plik RCP - jego pliki dołączą się same.</div></div></div>
     <div class="wiersz" style="border:0"><span class="et"><span>Dodatkowe pliki<small id="z-dodatkowe">${dodatkowe.length ? dodatkowe.map((p) => esc(p.split(/[\\/]/).pop())).join(', ') : 'np. zrzuty ekranu'}</small></span></span>
       <span class="wartosci"><button class="btn btn-maly" id="z-dodaj">Dodaj pliki</button>${dodatkowe.length ? '<button class="btn btn-maly btn-bez" id="z-wyczysc">Wyczyść</button>' : ''}</span></div>
     <button class="btn btn-hr duzy" id="z-wyslij">${ik('wyslij')} Wyślij zgłoszenie</button></section>`;
+  // Pliki tego RCP (przed korektą, poprawione, raporty) - dołączane automatycznie, można odznaczyć
+  api('pliki_do_zgloszenia').then((z) => {
+    if (!z?.pliki.length || !$('#z-zalaczniki')) return;
+    $('#z-zalaczniki').innerHTML = z.pliki.map((p) => `<label><input type="checkbox" value="${esc(p.sciezka)}" data-kb="${p.kb}" ${p.zaznacz ? 'checked' : ''}>
+      <span style="flex:1; min-width:0"><b style="font-weight:500">${esc(p.nazwa)}</b><br><span class="podp">${esc(p.opis)}</span></span><span class="podp">${p.kb} KB</span></label>`).join('');
+    const suma = () => { const kb = $$('#z-zalaczniki input:checked').reduce((s, c) => s + +c.dataset.kb, 0); $('#z-rozmiar').innerHTML = `<span class="podp">· razem ${(kb / 1024).toFixed(1)} MB z ${z.limit_mb} MB</span>`; };
+    $$('#z-zalaczniki input').forEach((c) => c.onchange = suma);
+    suma();
+  });
   $('#z-dodaj').onclick = async () => { dodatkowe = [...dodatkowe, ...((await api('wybierz_zalaczniki')) || [])]; const e = $('#z-email').value, o = $('#z-opis').value; rysujZgloszenie(); $('#z-email').value = e; $('#z-opis').value = o; };
   $('#z-wyczysc')?.addEventListener('click', () => { dodatkowe = []; rysujZgloszenie(); });
   $('#z-wyslij').onclick = async () => {
@@ -970,7 +984,7 @@ function rysujZgloszenie() {
     if (opis.length < 5) return toast('Opisz problem.', 'blad');
     $('#z-wyslij').disabled = true;
     $('#z-wyslij').textContent = 'Wysyłanie…';
-    const r = await api('zglos_blad', email, opis, $('#z-pliki').checked, dodatkowe);
+    const r = await api('zglos_blad', email, opis, $$('#z-zalaczniki input:checked').map((c) => c.value), dodatkowe);
     if (r?.ok) { dodatkowe = []; toast('Zgłoszenie wysłane. Dziękuję!', 'ok'); rysujZgloszenie(); }
     else { toast(esc(r?.blad || 'Nie udało się wysłać zgłoszenia.'), 'blad'); $('#z-wyslij').disabled = false; $('#z-wyslij').innerHTML = `${ik('wyslij')} Wyślij zgłoszenie`; }
   };
@@ -994,6 +1008,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (widok !== 'pulpit' || !STAN?.rcp) return;
+  if (filtr.tryb === 'wszystkie' && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') && !(e.ctrlKey)) return;
   if (e.ctrlKey && e.key.toLowerCase() === 'f') { e.preventDefault(); return $('#f-szukaj')?.focus(); }
   if (wPolu && e.key !== 'ArrowDown') return;
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

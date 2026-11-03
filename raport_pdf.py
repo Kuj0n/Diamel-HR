@@ -15,7 +15,8 @@ from fpdf import FPDF
 logging.getLogger("fontTools").setLevel(logging.ERROR)  # Segoe UI: niegroźne komunikaty przy wycinaniu czcionki
 
 CZCIONKI = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
-KOLUMNY = [("", 6), ("Data", 16), ("Nr", 12), ("Pracownik", 46), ("Zmiana", 24), ("Problem", 72), ("", 6)]
+# Problem + odbicia z dnia, Poprawka = miejsce na ręczny wpis (co wprowadzić w ERP), OK = kratka po wprowadzeniu
+KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 40), ("Zmiana", 20), ("Problem", 58), ("Poprawka", 27), ("OK", 6)]
 
 
 def _data(d):
@@ -52,7 +53,7 @@ class _Pdf(FPDF):
 
 
 def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=False, kratki=True,
-           pominiete=(), nazwiska=None, nieobecnosci=0):
+           pominiete=(), nazwiska=None, nieobecnosci=(), zakres=""):
     """
     anomalie: lista z interfejs.Api.anomalie (bez nieobecności) - pola data, pracownik, nazwisko, dzial, typ_zmiany, uwaga, rodzaj, status
     pominiete: lista (data, nr) dni wyłączonych z pliku ERP
@@ -113,11 +114,15 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
     if kratki:
         pdf.rect(pdf.get_x() + 1, pdf.get_y() + 0.8, 2.6, 2.6)
         pdf.set_x(pdf.get_x() + 5)
-        pdf.cell(40, 4, "do odhaczenia po sprawdzeniu")
+        pdf.cell(40, 4, "po wprowadzeniu poprawki w ERP")
     pdf.ln(5)
+    if zakres:
+        pdf.set_font("txt", "B", 8)
+        pdf.cell(0, 4, f"Zakres raportu: {zakres}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("txt", "", 8)
     if nieobecnosci:
         pdf.set_text_color(70)
-        pdf.cell(0, 4, f"Nieobecności bez wpisu w planie urlopów: {nieobecnosci} (pominięte w tym raporcie, są w raporcie TXT).",
+        pdf.cell(0, 4, f"Nieobecności bez wpisu w planie urlopów: {len(nieobecnosci)} dni - lista na końcu raportu.",
                  new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0)
 
@@ -156,7 +161,7 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             linie = max(1, len(pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L", dry_run=True, output="LINES")))
             pdf.set_font("txt", "", 7)
             linie_odb = len(pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L", dry_run=True, output="LINES"))
-            h = 4 * linie + 3.3 * linie_odb + 2
+            h = max(9.5, 4 * linie + 3.3 * linie_odb + 2)  # min. wysokość: miejsce na ręczny wpis
             if pdf.get_y() + h > 279:
                 pdf.add_page()
                 naglowek_tabeli()
@@ -186,6 +191,13 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L")
             pdf.set_text_color(0)
             x += KOLUMNY[5][1]
+            pdf.set_draw_color(150)
+            pdf.set_line_width(0.2)
+            pdf.set_dash_pattern(dash=0.8, gap=0.8)
+            pdf.line(x + 1, y + h - 1.8, x + KOLUMNY[6][1] - 2, y + h - 1.8)
+            pdf.set_dash_pattern()
+            pdf.set_draw_color(0)
+            x += KOLUMNY[6][1]
             if kratki:
                 pdf.set_line_width(0.25)
                 pdf.rect(x + 1.2, y + 1.4, 2.8, 2.8)
@@ -208,6 +220,41 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
         pdf.set_font("txt", "", 8)
         for d, nr in pominiete:
             pdf.cell(0, 4.4, f"{_data(d)}.{d[:4]}   {nr}   {nazwiska.get(nr, '---')}", new_x="LMARGIN", new_y="NEXT")
+
+    if nieobecnosci:
+        # Jeden wiersz na pracownika: numer, nazwisko, dział i dni bez odbić
+        osoby = OrderedDict()
+        for a in sorted(nieobecnosci, key=lambda a: (a["dzial"], a["pracownik"], a["data"])):
+            osoby.setdefault((a["pracownik"], a["nazwisko"], a["dzial"]), []).append(_data(a["data"]))
+        if pdf.get_y() > 250:
+            pdf.add_page()
+        pdf.ln(5)
+        pdf.set_font("txt", "B", 10)
+        pdf.cell(0, 6, f"Nieobecności bez wpisu w planie urlopów ({len(nieobecnosci)} dni)", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("txt", "", 7.5)
+        pdf.set_text_color(60)
+        pdf.cell(0, 4, "Dni robocze bez żadnego odbicia. Wczytanie planu nieobecności (Excel) usuwa z listy dni urlopów.", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0)
+        pdf.ln(1)
+        for (nr, nazwisko, dzial), dni in osoby.items():
+            if pdf.get_y() > 272:
+                pdf.add_page()
+            y = pdf.get_y()
+            pdf.set_font("mono", "", 7.8)
+            pdf.cell(11, 4.2, nr)
+            pdf.set_font("txt", "B", 8)
+            pdf.cell(46, 4.2, pdf_skroc(pdf, nazwisko, 45))
+            pdf.set_font("txt", "", 7.5)
+            pdf.set_text_color(60)
+            pdf.cell(38, 4.2, pdf_skroc(pdf, dzial, 37))
+            pdf.set_text_color(0)
+            pdf.set_font("txt", "", 8)
+            pdf.multi_cell(87, 4.2, ", ".join(dni), align="L", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_draw_color(205)
+            pdf.set_line_width(0.15)
+            pdf.line(14, pdf.get_y() + 0.4, 196, pdf.get_y() + 0.4)
+            pdf.set_draw_color(0)
+            pdf.ln(1)
 
     if podpisy:
         if pdf.get_y() > 250:

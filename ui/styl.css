@@ -205,6 +205,9 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .lista { display: flex; flex-direction: column; min-height: 260px; flex: 1; padding: 16px 0 0; overflow: hidden; }
 .lista .naglowek { display: flex; align-items: center; gap: 12px; padding: 0 20px 12px; flex-wrap: wrap; }
 .lista .naglowek h3 { margin-right: 6px; }
+.tryb-listy button { padding: 6px 14px; font-size: 0.92rem; font-weight: 600; }
+.tryb-listy button b { font-weight: 600; margin-left: 4px; color: var(--muted); }
+.tryb-listy button.akt b { color: var(--czerwony-tekst); }
 .lista .filtry { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .lista .szukaj { margin-left: auto; display: flex; gap: 8px; }
 .przewijana { overflow: auto; flex: 1; border-top: 1px solid var(--border); }
@@ -255,6 +258,9 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .wiersz .wartosci { display: flex; align-items: center; gap: 8px; flex: none; }
 .wiersz.kolumna { flex-direction: column; align-items: stretch; gap: 8px; }
 .wiersz.kolumna .chipy { justify-content: flex-start; max-width: none; }
+.chipy span.przerywane { background: transparent; border: 1px dashed var(--border-2); }
+.rozwin summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; margin-bottom: 6px; }
+.rozwin summary:hover { color: var(--text); }
 .wiersz.wylaczony .wartosci .pole, .wiersz.wylaczony .wartosci .segment { opacity: 0.4; pointer-events: none; }
 .wiersz.lokalna .et::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--zolty); flex: none; box-shadow: 0 0 0 3px var(--zolty-tlo); }
 .przywroc { color: var(--zolty-tekst); background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; }
@@ -353,6 +359,13 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .historia-poz b { font-size: 0.98rem; }
 .historia-poz .meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.82rem; }
 .historia-poz .meta span b { color: var(--text-2); font-size: 0.82rem; font-weight: 600; }
+.pliki-wynikowe { grid-column: span 2; border-top: 1px solid var(--linia); padding-top: 8px; }
+.pliki-wynikowe summary { display: inline-flex; align-items: center; gap: 6px; font-size: 0.86rem; color: var(--text-2); }
+.pliki-wynikowe summary svg { width: 15px; height: 15px; color: var(--kolor); transition: transform 0.15s; }
+.pliki-wynikowe[open] summary svg { transform: rotate(45deg); }
+.pliki-wynikowe .tab td { padding: 6px 8px; }
+.pliki-wynikowe .tab td:first-child { padding-left: 0; }
+.pliki-wynikowe .tab tbody tr { cursor: default; }
 
 @keyframes pojaw { from { opacity: 0; } }
 @keyframes wjedz { from { transform: translateX(40px); opacity: 0; } }

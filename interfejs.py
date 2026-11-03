@@ -6,9 +6,11 @@ Obliczenia: silnik.py. Serwer (logowanie, lista pracowników, reguły firmowe): 
 Każda funkcja zwraca dane, które da się zamienić na JSON (słowniki, listy, teksty, liczby).
 """
 import base64
+import glob
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,7 +44,7 @@ PULS_SEKUNDY = 120  # sygnał "program otwarty" dla panelu HR (Status -> Teraz)
 USTAWIENIA_PROGRAMU = {
     "motyw": "system",          # jasny / ciemny / system
     "rozmiar": "normalny",      # maly / normalny / duzy
-    "eksport_txt": True,
+    "eksport_txt": False,
     "eksport_pdf": True,
     "pdf_podpisy": False,
     "pdf_kratki": True,
@@ -491,7 +493,8 @@ class Api:
             if (nr and p != nr) or (data and d != data):
                 continue
             wynik.append({"id": f"{d}|{p}", "data": d, "nr": p, "nazwisko": s.baza_pracownikow.get(p, "---"),
-                          "zdarzenia": " · ".join(f"{format_czas_gui(z['czas'])} {z['kod']}" for z in zdarzenia)})
+                          "dzial": s.pobierz_dzial_pracownika(p), "typ_zmiany": s.kontekst_pracownikow.get((d, p), {}).get("typ_zmiany", "---"),
+                          "zdarzenia": " · ".join(f"{format_czas_gui(z['czas'])} {KODY_KROTKO.get(z['kod'], z['kod'])}" for z in zdarzenia)})
         return wynik
 
     # ------------------------------------------------------------------ zapis do ERP i raporty
@@ -540,12 +543,27 @@ class Api:
             zd = self._silnik.dane_do_zapisu.get((a["data"], a["pracownik"]), [])
             return " · ".join(f"{KODY_KROTKO.get(z['kod'], z['kod'])} {format_czas_gui(z['czas'])}"
                               + (f" (RCP {format_czas_gui(z['czas_oryg'])})" if z.get("czas_oryg") not in (None, "", "---", z["czas"]) else "") for z in zd)
-        raport_pdf.zapisz(sciezka, anomalie=[{**a, "odbicia": odbicia(a)} for a in self.anomalie if a["rodzaj"] != "nieobecnosc"],
+        # Raport PDF = to, co zaznaczone w filtrach listy (rodzaje problemów i działy); bez filtra - wszystko
+        rodzaje, dzialy = getattr(self, "_filtr_raportu", (None, None))
+        wybrane = [a for a in self.anomalie if (not rodzaje or a["rodzaj"] in rodzaje) and (not dzialy or a["dzial"] in dzialy)]
+        zakres = []
+        if dzialy:
+            nazwy_dzialow = sorted(d for d in dzialy if d in {a["dzial"] for a in self.anomalie})
+            zakres.append("działy: " + ", ".join(nazwy_dzialow) if nazwy_dzialow else "żaden dział")
+        if rodzaje and set(rodzaje) != {"blad", "niepelny", "ostrzezenie", "nieobecnosc"}:
+            nazwy = {"blad": "błędy", "niepelny": "niepełne", "ostrzezenie": "ostrzeżenia", "nieobecnosc": "nieobecności"}
+            zakres.append("tylko " + ", ".join(nazwy[r] for r in nazwy if r in rodzaje))
+        raport_pdf.zapisz(sciezka, anomalie=[{**a, "odbicia": odbicia(a)} for a in wybrane if a["rodzaj"] != "nieobecnosc"], zakres="; ".join(zakres),
                           statystyki=self._statystyki(), plik=os.path.basename(self.plik_rcp), uzytkownik=self.dane_serwera.get("login") or self.program.get("login", ""),
                           wersja=VERSION, podpisy=self.program["pdf_podpisy"],
                           kratki=self.program["pdf_kratki"], pominiete=sorted(pomijane), nazwiska=self._silnik.baza_pracownikow,
-                          nieobecnosci=sum(1 for a in self.anomalie if a["rodzaj"] == "nieobecnosc"))
+                          nieobecnosci=[a for a in wybrane if a["rodzaj"] == "nieobecnosc"])
         return sciezka
+
+    def ustaw_filtr_raportu(self, rodzaje, dzialy):
+        """Filtry z listy na pulpicie - raport PDF zawiera tylko zaznaczone rodzaje problemów i działy (puste = wszystkie)."""
+        self._filtr_raportu = (set(rodzaje or []), set(dzialy or []))
+        return {"ok": True}
 
     def eksport_raportu(self, format_):
         """Raport zapisywany od razu w folderze zapisu (domyślnie obok pliku z RCP): <plik>_RAPORT_BRAKOW_<n>.<txt|pdf>."""
@@ -595,8 +613,32 @@ class Api:
             wpis.setdefault("zapisy", []).append({"kiedy": datetime.now().strftime("%Y-%m-%d %H:%M"), "pliki": zapisane, "pominieto": pominieto})
         _zapisz_json(PLIK_HISTORII, historia[:HISTORIA_MAX])
 
+    def pliki_wynikowe(self, plik_bazowy):
+        """Pliki zapisane z danego pliku RCP (także przez starsze wersje): <plik>_poprawione_N.txt, <plik>_RAPORT_BRAKOW_N.txt/.pdf
+        w jego folderze i w folderze zapisu z ustawień. Od najnowszego."""
+        rdzen = os.path.splitext(os.path.basename(plik_bazowy))[0]
+        foldery = {os.path.dirname(plik_bazowy)} | ({self.program["folder_zapisu"]} if self.program["folder_zapisu"] else set())
+        wynik = []
+        for folder in foldery:
+            for sciezka in glob.glob(os.path.join(glob.escape(folder), glob.escape(rdzen) + "_*")):
+                m = re.fullmatch(re.escape(rdzen) + r"_(poprawione|RAPORT_BRAKOW)_(\d+)\.(txt|pdf)", os.path.basename(sciezka), re.IGNORECASE)
+                if not m or not os.path.isfile(sciezka):
+                    continue
+                wynik.append({"sciezka": sciezka, "nazwa": os.path.basename(sciezka), "numer": int(m.group(2)),
+                              "rodzaj": "erp" if m.group(1).lower() == "poprawione" else m.group(3).lower(),
+                              "kiedy": datetime.fromtimestamp(os.path.getmtime(sciezka)).strftime("%Y-%m-%d %H:%M"),
+                              "kb": max(1, round(os.path.getsize(sciezka) / 1024))})
+        return sorted(wynik, key=lambda p: (-p["numer"], p["rodzaj"] != "erp", p["nazwa"]))
+
     def historia(self):
-        return [{**w, "istnieje": os.path.isfile(w.get("plik", ""))} for w in _czytaj_json(PLIK_HISTORII, [])]
+        return [{**w, "istnieje": os.path.isfile(w.get("plik", "")), "pliki": self.pliki_wynikowe(w.get("plik", ""))}
+                for w in _czytaj_json(PLIK_HISTORII, [])]
+
+    def otworz_plik(self, sciezka):
+        if os.path.isfile(sciezka):
+            os.startfile(sciezka)
+            return {"ok": True}
+        return {"ok": False, "blad": "Nie znaleziono pliku - został przeniesiony albo usunięty."}
 
     def otworz_z_historii(self, id_):
         wpis = next((w for w in _czytaj_json(PLIK_HISTORII, []) if w.get("id") == id_), None)
@@ -613,8 +655,29 @@ class Api:
         wynik = self._okno.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return list(wynik or [])
 
-    def zglos_blad(self, email, opis, dolacz_pliki, dodatkowe):
-        pliki = [p for p in ([self.plik_rcp, self.plik_urlopow] if dolacz_pliki else []) + list(dodatkowe) if p and os.path.isfile(p)]
+    def pliki_do_zgloszenia(self):
+        """Proponowane załączniki zgłoszenia: wczytany plik RCP, plan nieobecności i pliki zapisane z tego RCP
+        (zaznaczone domyślnie: najnowszy plik poprawiony i najnowsze raporty)."""
+        wynik = []
+        if self.plik_rcp and os.path.isfile(self.plik_rcp):
+            wynik.append({"sciezka": self.plik_rcp, "opis": "plik z Roger RCP (przed korektą)", "zaznacz": True})
+        if self.plik_urlopow and os.path.isfile(self.plik_urlopow):
+            wynik.append({"sciezka": self.plik_urlopow, "opis": "plan nieobecności", "zaznacz": True})
+        if self.plik_rcp:
+            pliki = self.pliki_wynikowe(self.plik_rcp)
+            najnowszy = {}
+            for p in pliki:
+                najnowszy.setdefault(p["rodzaj"], p["numer"])
+            for p in pliki:
+                opis = f"plik poprawiony dla ERP, wersja {p['numer']}" if p["rodzaj"] == "erp" else f"raport {p['rodzaj'].upper()}, wersja {p['numer']}"
+                wynik.append({"sciezka": p["sciezka"], "opis": f"{opis} · {p['kiedy']}", "zaznacz": p["numer"] == najnowszy[p["rodzaj"]]})
+        for w in wynik:
+            w["nazwa"] = os.path.basename(w["sciezka"])
+            w["kb"] = max(1, round(os.path.getsize(w["sciezka"]) / 1024))
+        return {"pliki": wynik, "limit_mb": ZALACZNIKI_MAX_MB}
+
+    def zglos_blad(self, email, opis, zalaczone, dodatkowe):
+        pliki = [p for p in list(dict.fromkeys(list(zalaczone) + list(dodatkowe))) if p and os.path.isfile(p)]
         rozmiar = sum(os.path.getsize(p) for p in pliki)
         if rozmiar > ZALACZNIKI_MAX_MB * 1024 * 1024:
             return {"ok": False, "blad": f"Załączniki mają razem {rozmiar / 1048576:.1f} MB - limit to {ZALACZNIKI_MAX_MB} MB."}
