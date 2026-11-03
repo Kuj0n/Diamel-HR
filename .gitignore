@@ -32,3 +32,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Prawdziwe pliki RCP do testów obliczeń - dane osobowe, nigdy do repozytorium
+testy/dane_prywatne/
