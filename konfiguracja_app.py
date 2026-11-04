@@ -5,16 +5,19 @@ import sys
 # KONFIGURACJA I METADANE
 # ==========================================
 VERSION = "4.0.0"
-BUILD_DATE = "2026-11-03 21:00"
+BUILD_DATE = "2026-11-04 10:00"
 
 CHANGELOG = """
-v4.0.0 (2026-11-03)
-- Całkowicie nowy wygląd: pulpit z listą do sprawdzenia, motyw jasny / ciemny / jak w Windows.
-- Korekta dnia w panelu z boku zamiast Menedżera danych: oś dnia, gotowe propozycje poprawek, "Zatwierdź i następny" (Enter).
+v4.0.0 (2026-11-04)
+- Całkowicie nowy wygląd okna, motyw jasny / ciemny / jak w Windows.
+- Ekran "Korekta logów": lista do sprawdzenia albo wszystkie wpisy, filtry (rodzaj problemu, działy, wyszukiwanie), skróty klawiszowe, przeciąganie plików na okno.
+- Korekta dnia w panelu z boku zamiast Menedżera danych: oś dnia, gotowe propozycje poprawek, "Zatwierdź i następny" (Enter), pytanie o niezapisane zmiany.
 - Przed zapisem pliku ERP pytanie o niesprawdzone pozycje: wróć, zapisz wszystko albo pomiń dni z błędami.
 - Reguły firmowe z panelu HR - takie same na wszystkich komputerach; zmiana u siebie widoczna jako lokalna, można ją zaproponować jako firmową.
-- Raport braków także w PDF (pod drukarkę czarno-białą, z odbiciami danego dnia i kratkami do odhaczania).
-- Filtry (rodzaj problemu, działy, wyszukiwanie), skróty klawiszowe, przeciąganie plików na okno, historia przetworzeń.
+- Raport braków w PDF pod drukarkę czarno-białą: według filtrów, z odbiciami danego dnia, miejscem na poprawkę i kratką do odhaczenia.
+- Historia przetworzeń z listą zapisanych plików poprawionych i raportów; zgłoszenie błędu z automatycznie dołączonymi plikami.
+- "Odśwież dane" z wyborem: baza pracowników i/lub reguły firmowe, z informacją, co się zmieniło.
+- Administrator może wycofać wadliwą wersję - program zaproponuje powrót do zalecanej (także gdy okno się nie uruchomi).
 - Ręczne korekty zostają po ponownym przetworzeniu i po zmianie reguł.
 
 v3.1.2 (2026-11-03)
