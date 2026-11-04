@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.0"
-BUILD_DATE = "2026-11-04 10:00"
+VERSION = "4.0.1"
+BUILD_DATE = "2026-11-04 12:00"
 
 CHANGELOG = """
+v4.0.1 (2026-11-04)
+- Raport PDF do wypełnienia na komputerze: pola "Poprawka" i "OK" działają w Edge / Acrobat (wpisz, zaznacz, zapisz plik), wydruk jak dotąd.
+
 v4.0.0 (2026-11-04)
 - Całkowicie nowy wygląd okna, motyw jasny / ciemny / jak w Windows.
 - Ekran "Korekta logów": lista do sprawdzenia albo wszystkie wpisy, filtry (rodzaj problemu, działy, wyszukiwanie), skróty klawiszowe, przeciąganie plików na okno.

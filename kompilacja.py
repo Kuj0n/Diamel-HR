@@ -117,7 +117,7 @@ komenda_pyinstaller = (
     f'--add-data "{folder_zasoby};{folder_zasoby}" '
     f'--add-data "{folder_ui};{folder_ui}" '
     f'--collect-all webview --collect-all clr_loader --collect-all pythonnet --hidden-import clr '
-    f'--hidden-import fpdf --hidden-import xlrd --hidden-import openpyxl '
+    f'--hidden-import fpdf --hidden-import pypdf --hidden-import xlrd --hidden-import openpyxl '
     f'--version-file="wersja_info.txt" '
     f'--hidden-import="ctypes" --collect-all ctypes '
     f'-n "{nazwa_stala}" "{plik_glowny}"'

@@ -3,14 +3,18 @@ raport_pdf.py
 
 Raport braków odbić w PDF - pod drukarkę czarno-białą: bez kolorów, rodzaj problemu oznaczony
 symbolem (X błąd, ! ostrzeżenie) i krojem pisma (pogrubienie / kursywa), pozycje pogrupowane po działach.
+Kolumny Poprawka i OK to pola formularza - raport można wypełnić na komputerze (Edge, Acrobat) albo wydrukować.
 Czcionki z Windows (Segoe UI, Consolas) - są na każdym komputerze z Windows 10/11.
 """
+import io
 import logging
 import os
 from collections import OrderedDict
 from datetime import datetime
 
 from fpdf import FPDF
+from pypdf import PdfWriter
+from pypdf.generic import ArrayObject, BooleanObject, DecodedStreamObject, DictionaryObject, FloatObject, NameObject, NumberObject, TextStringObject
 
 logging.getLogger("fontTools").setLevel(logging.ERROR)  # Segoe UI: niegroźne komunikaty przy wycinaniu czcionki
 
@@ -58,6 +62,7 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
     anomalie: lista z interfejs.Api.anomalie (bez nieobecności) - pola data, pracownik, nazwisko, dzial, typ_zmiany, uwaga, rodzaj, status
     pominiete: lista (data, nr) dni wyłączonych z pliku ERP
     """
+    pola_formularza = []  # pola formularza dodawane po zapisie (dodaj_pola)
     pdf = _Pdf(f"Raport braków odbić · {plik}")  # stopka bez reguł - raport trafia też do osób spoza kadr
     pdf.add_page()
 
@@ -116,6 +121,10 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
         pdf.set_x(pdf.get_x() + 5)
         pdf.cell(40, 4, "po wprowadzeniu poprawki w ERP")
     pdf.ln(5)
+    pdf.set_text_color(70)
+    pdf.cell(0, 4, "Poprawkę i OK można wpisać na komputerze (np. w Edge: kliknij w pole, potem zapisz plik) albo ręcznie po wydruku.",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0)
     if zakres:
         pdf.set_font("txt", "B", 8)
         pdf.cell(0, 4, f"Zakres raportu: {zakres}", new_x="LMARGIN", new_y="NEXT")
@@ -198,21 +207,19 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L")
             pdf.set_text_color(0)
             x += KOLUMNY[5][1]
-            pdf.set_draw_color(150)
+            # Ramka na poprawkę: do wpisania na komputerze (pole formularza) albo ręcznie po wydruku
+            pdf.set_draw_color(170)
             pdf.set_line_width(0.2)
-            pdf.set_dash_pattern(dash=0.8, gap=0.8)
-            for linia in (y + h - 7, y + h - 2):
-                pdf.line(x + 1, linia, x + KOLUMNY[6][1] - 2, linia)
-            pdf.set_dash_pattern()
+            pdf.rect(x + 0.6, y + 0.6, KOLUMNY[6][1] - 1.6, h - 1.2)
             pdf.set_draw_color(0)
+            pola_formularza.append({"typ": "tekst", "strona": pdf.page_no(), "x": x + 0.6, "y": y + 0.6, "w": KOLUMNY[6][1] - 1.6, "h": h - 1.2,
+                         "nazwa": f"poprawka_{len(pola_formularza)}", "opis": f"Poprawka: {a['pracownik']} {_data(a['data'])}"})
             x += KOLUMNY[6][1]
             if kratki:
                 pdf.set_line_width(0.25)
                 pdf.rect(x + 1.2, y + 1.4, 2.8, 2.8)
-                if a.get("status"):
-                    pdf.set_font("txt", "B", 7)
-                    pdf.set_xy(x + 1.2, y + 1.1)
-                    pdf.cell(2.8, 3.4, "v", align="C")
+                pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": x + 1.2, "y": y + 1.4, "w": 2.8, "h": 2.8,
+                             "nazwa": f"ok_{len(pola_formularza)}", "zaznaczone": bool(a.get("status")), "opis": f"OK: {a['pracownik']} {_data(a['data'])}"})
             pdf.set_xy(14, y + h)
 
     if not anomalie:
@@ -280,7 +287,66 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
         pdf.cell(78, 4, "Zatwierdził(a) - data i podpis")
 
     pdf.output(sciezka)
+    dodaj_pola(sciezka, pola_formularza)
     return sciezka
+
+
+def dodaj_pola(sciezka, pola):
+    """
+    Pola formularza w gotowym PDF (fpdf2 ich nie tworzy): tekst wielowierszowy w kolumnie Poprawka, pole wyboru w kolumnie OK.
+    Współrzędne pól w mm od lewego górnego rogu strony A4 (jak w fpdf2) - PDF liczy w punktach od dołu.
+    """
+    if not pola:
+        return
+    pt = 72 / 25.4
+    with open(sciezka, "rb") as f:
+        w = PdfWriter(clone_from=io.BytesIO(f.read()))  # z pamięci - ten sam plik jest potem nadpisywany
+    helv = w._add_object(DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+                                           NameObject("/BaseFont"): NameObject("/Helvetica"), NameObject("/Encoding"): NameObject("/WinAnsiEncoding")}))
+    zadb = w._add_object(DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+                                           NameObject("/BaseFont"): NameObject("/ZapfDingbats")}))
+
+    def wyglad(szer, wys, tresc):
+        s = DecodedStreamObject()
+        s.set_data(tresc)
+        s.update({NameObject("/Type"): NameObject("/XObject"), NameObject("/Subtype"): NameObject("/Form"),
+                  NameObject("/BBox"): ArrayObject([FloatObject(0), FloatObject(0), FloatObject(szer), FloatObject(wys)]),
+                  NameObject("/Resources"): DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/ZaDb"): zadb})})})
+        return w._add_object(s)
+
+    pola_pdf = ArrayObject()
+    for p in pola:
+        strona = w.pages[p["strona"] - 1]
+        wys_strony = float(strona.mediabox.height)
+        x0, y1 = p["x"] * pt, wys_strony - p["y"] * pt
+        x1, y0 = x0 + p["w"] * pt, y1 - p["h"] * pt
+        pole = DictionaryObject({NameObject("/Type"): NameObject("/Annot"), NameObject("/Subtype"): NameObject("/Widget"),
+                                 NameObject("/T"): TextStringObject(p["nazwa"]), NameObject("/TU"): TextStringObject(p["opis"]),
+                                 NameObject("/Rect"): ArrayObject([FloatObject(round(v, 2)) for v in (x0, y0, x1, y1)]),
+                                 NameObject("/F"): NumberObject(4), NameObject("/P"): strona.indirect_reference})
+        if p["typ"] == "tekst":
+            pole.update({NameObject("/FT"): NameObject("/Tx"), NameObject("/Ff"): NumberObject(4096),  # wielowierszowe
+                         NameObject("/DA"): TextStringObject("/Helv 8 Tf 0 g"), NameObject("/V"): TextStringObject(""),
+                         NameObject("/MK"): DictionaryObject()})
+        else:
+            szer, wys = x1 - x0, y1 - y0
+            stan = NameObject("/Tak" if p["zaznaczone"] else "/Off")
+            pole.update({NameObject("/FT"): NameObject("/Btn"), NameObject("/V"): stan, NameObject("/AS"): stan,
+                         NameObject("/DA"): TextStringObject("/ZaDb 0 Tf 0 g"),
+                         NameObject("/MK"): DictionaryObject({NameObject("/CA"): TextStringObject("4")}),
+                         NameObject("/AP"): DictionaryObject({NameObject("/N"): DictionaryObject({
+                             NameObject("/Tak"): wyglad(szer, wys, f"q 0 g BT /ZaDb {wys * 0.9:.2f} Tf {szer * 0.1:.2f} {wys * 0.18:.2f} Td (4) Tj ET Q".encode()),
+                             NameObject("/Off"): wyglad(szer, wys, b"")})})})
+        ref = w._add_object(pole)
+        if "/Annots" not in strona:
+            strona[NameObject("/Annots")] = ArrayObject()
+        strona["/Annots"].append(ref)
+        pola_pdf.append(ref)
+    w._root_object[NameObject("/AcroForm")] = DictionaryObject({
+        NameObject("/Fields"): pola_pdf, NameObject("/NeedAppearances"): BooleanObject(True),
+        NameObject("/DA"): TextStringObject("/Helv 8 Tf 0 g"),
+        NameObject("/DR"): DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/Helv"): helv, NameObject("/ZaDb"): zadb})})})
+    w.write(sciezka)
 
 
 def pdf_skroc(pdf, tekst, szerokosc):
