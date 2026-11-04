@@ -128,22 +128,22 @@ async function sprawdzAktualizacje(recznie) {
   AKT = await api('sprawdz_aktualizacje');
   odswiezDol();
   const miejsce = $('#start-aktualizacja');
-  if (AKT?.nowsza) {
-    miejsce.innerHTML = `<div class="baner zolty">${ik('pobierz')}<div class="tekst"><b>Dostępna wersja ${esc(AKT.wersja)}</b>Możesz zainstalować ją przed zalogowaniem.</div>
+  if (AKT?.do_instalacji) {
+    miejsce.innerHTML = `<div class="baner zolty">${ik('pobierz')}<div class="tekst"><b>${AKT.wycofana ? `Administrator zaleca powrót do wersji ${esc(AKT.wersja)}` : `Dostępna wersja ${esc(AKT.wersja)}`}</b>${AKT.wycofana ? 'W tej wersji wykryto błąd - zainstaluj zalecaną.' : 'Możesz zainstalować ją przed zalogowaniem.'}</div>
       <button class="btn btn-maly" id="start-instaluj">Zainstaluj</button></div>`;
     $('#start-instaluj').onclick = oknoAktualizacji;
   } else miejsce.innerHTML = '';
   if (recznie) {
     if (!AKT?.ok) toast(`Nie udało się sprawdzić aktualizacji: ${esc(AKT?.blad || '')}`, 'blad');
-    else if (AKT.nowsza) oknoAktualizacji();
+    else if (AKT.do_instalacji) oknoAktualizacji();
     else toast(`Masz najnowszą wersję (${esc(INFO.wersja)}).`, 'ok');
   }
 }
 
 async function oknoAktualizacji() {
   const w = await modal({
-    tytul: `${ik('pobierz')} Aktualizacja do wersji ${esc(AKT.wersja)}`, szeroki: true,
-    tresc: `<p>Obecna wersja: <b>${esc(INFO.wersja)}</b>. Program zamknie się na czas instalacji i uruchomi ponownie.</p>
+    tytul: `${ik('pobierz')} ${AKT.wycofana ? 'Powrót do wersji' : 'Aktualizacja do wersji'} ${esc(AKT.wersja)}`, szeroki: true,
+    tresc: `<p>Obecna wersja: <b>${esc(INFO.wersja)}</b>. ${AKT.wycofana ? 'Administrator wycofał tę wersję (wykryto błąd) i zaleca zainstalowanie poprzedniej - Twoje ustawienia i logowanie zostaną. ' : ''}Program zamknie się na czas instalacji i uruchomi ponownie.</p>
       <div class="karta" style="white-space:pre-wrap; max-height:300px; overflow:auto; font-size:0.86rem">${esc(AKT.opis || 'Brak opisu zmian.')}</div>`,
     przyciski: [{ tekst: 'Później', wartosc: null }, { tekst: `${ik('pobierz')} Pobierz i zainstaluj`, klasa: 'btn-hr', wartosc: 'tak', domyslny: true }],
   });
@@ -211,7 +211,7 @@ function odswiezDol() {
   $('#dol-konto').innerHTML = KONTO ? `Zalogowano: <b>${esc(KONTO.login || 'tak')}</b>` : 'Bez listy pracowników';
   $('#dol-baza').innerHTML = KONTO ? `Baza pracowników: <b>${liczba(KONTO.pracownikow)}</b>` : '';
   const w = $('#dol-wersja');
-  if (AKT?.nowsza) { w.innerHTML = `<span class="akt-nowa">● dostępna wersja ${esc(AKT.wersja)}</span>`; w.onclick = oknoAktualizacji; }
+  if (AKT?.do_instalacji) { w.innerHTML = `<span class="akt-nowa">● ${AKT.wycofana ? 'zalecana wersja' : 'dostępna wersja'} ${esc(AKT.wersja)}</span>`; w.onclick = oknoAktualizacji; }
   else { w.innerHTML = `<span class="akt-ok">● v${esc(INFO.wersja || '')}${AKT?.ok ? ' · aktualna' : ''}</span>`; w.onclick = null; }
   const doSpr = STAN?.statystyki?.do_sprawdzenia || 0;
   $('#licznik-pulpit').textContent = doSpr;
@@ -931,8 +931,8 @@ function rysujUstawienia() {
       <div class="wiersz"><span class="et">Reguły firmowe</span><span>${REG.sa_firmowe ? esc(REG.wersja || 'tak') : 'brak'}</span></div>
       <div class="wiersz"><span class="et"></span><span class="wartosci">${KONTO ? `<button class="btn btn-maly" id="u-odswiez">${ik('odswiez')} Odśwież dane</button><button class="btn btn-maly btn-czerwony" id="u-wyloguj">Wyloguj</button>` : '<button class="btn btn-maly btn-hr" id="u-zaloguj">Zaloguj</button>'}</span></div></section>
     <section class="karta" style="grid-column: span 2"><h3>${ik('pobierz')}O programie</h3><p class="opis">Korektor Logów HR v${esc(INFO.wersja)} · ${esc(INFO.data)} · © Mateusz Kujawa, DIAMEL</p>
-      <div class="wiersz"><span class="et">${AKT?.nowsza ? `Dostępna wersja <b>${esc(AKT.wersja)}</b>` : 'Aktualizacje'}</span>
-        <span class="wartosci"><button class="btn btn-maly" id="u-zmiany">Historia zmian</button><button class="btn btn-maly" id="u-www">Strona programu</button><button class="btn btn-maly ${AKT?.nowsza ? 'btn-hr' : ''}" id="u-akt">${AKT?.nowsza ? 'Zainstaluj' : 'Sprawdź aktualizacje'}</button></span></div></section>
+      <div class="wiersz"><span class="et">${AKT?.do_instalacji ? `${AKT.wycofana ? 'Zalecana (starsza) wersja' : 'Dostępna wersja'} <b>${esc(AKT.wersja)}</b>` : 'Aktualizacje'}</span>
+        <span class="wartosci"><button class="btn btn-maly" id="u-zmiany">Historia zmian</button><button class="btn btn-maly" id="u-www">Strona programu</button><button class="btn btn-maly ${AKT?.do_instalacji ? 'btn-hr' : ''}" id="u-akt">${AKT?.do_instalacji ? 'Zainstaluj' : 'Sprawdź aktualizacje'}</button></span></div></section>
   </div>`;
   $$('[data-prog]', el).forEach((b) => b.onclick = async () => { await zmienProgram(b.dataset.prog, !p[b.dataset.prog]); rysujUstawienia(); });
   $$('[data-prog-seg]', el).forEach((b) => b.onclick = async () => { await zmienProgram(b.dataset.progSeg, b.dataset.wartosc); rysujUstawienia(); });
@@ -972,7 +972,7 @@ function rysujUstawienia() {
   $('#u-zaloguj')?.addEventListener('click', () => ekranLogowania());
   $('#u-zmiany').onclick = () => modal({ tytul: 'Historia zmian', szeroki: true, tresc: `<div style="white-space:pre-wrap; font-size:0.86rem; max-height:60vh; overflow:auto">${esc(INFO.changelog)}</div>`, przyciski: [{ tekst: 'Zamknij', wartosc: null }] });
   $('#u-www').onclick = () => api('otworz_strone', 'https://diamel.pl/hr/aktualizacje-hr.php');
-  $('#u-akt').onclick = () => (AKT?.nowsza ? oknoAktualizacji() : sprawdzAktualizacje(true).then(() => widok === 'ustawienia' && rysujUstawienia()));
+  $('#u-akt').onclick = () => (AKT?.do_instalacji ? oknoAktualizacji() : sprawdzAktualizacje(true).then(() => widok === 'ustawienia' && rysujUstawienia()));
 }
 
 // ------------------------------------------------------------------ zgłoszenie błędu

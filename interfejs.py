@@ -93,6 +93,7 @@ class Api:
         self.reguly_lokalne = {k: v for k, v in zapis.get("reguly_lokalne", {}).items() if k not in TYLKO_ADMIN}
         self.program = {**USTAWIENIA_PROGRAMU, **zapis.get("program", {})}
         self._wyczysc_sesje()
+        self.ui_gotowe = threading.Event()
 
     def _wyczysc_sesje(self):
         self.plik_rcp = ""
@@ -109,11 +110,16 @@ class Api:
     # ------------------------------------------------------------------ start, aktualizacje, logowanie
 
     def informacje(self):
+        self.ui_gotowe.set()  # okno programu działa - awaryjne okienko aktualizacji (aplikacja.py) niepotrzebne
         return {"wersja": VERSION, "data": BUILD_DATE[:10], "program": self.program, "komputer": platform.node(),
                 "changelog": CHANGELOG.strip()}
 
     def sprawdz_aktualizacje(self):
-        """Najnowsze wydanie z GitHub. Działa bez logowania - poprawkę da się zainstalować, nawet gdy logowanie nie działa."""
+        """
+        Wersja zalecana = wydanie oznaczone na GitHub jako najnowsze (administrator może je zmienić w panelu HR).
+        nowsza: jest nowsza wersja; wycofana: zalecana jest starsza niż zainstalowana (w tej wersji wykryto błąd) -
+        w obu przypadkach do_instalacji. Działa bez logowania - poprawkę da się zainstalować, nawet gdy logowanie nie działa.
+        """
         try:
             dane, zalaczniki = pobierz_wydanie()
         except Exception as e:
@@ -122,9 +128,11 @@ class Api:
         link = next((u for n, u in zalaczniki.items() if n.lower().endswith(".exe")), "")
         try:
             nowsza = bool(link) and wez_krotke(wersja) > wez_krotke(VERSION)
+            wycofana = bool(link) and wez_krotke(wersja) < wez_krotke(VERSION)
         except ValueError:
-            nowsza = False
-        return {"ok": True, "nowsza": nowsza, "wersja": wersja, "opis": dane.get("body") or "", "link": link}
+            nowsza = wycofana = False
+        return {"ok": True, "nowsza": nowsza, "wycofana": wycofana, "do_instalacji": nowsza or wycofana,
+                "wersja": wersja, "opis": dane.get("body") or "", "link": link}
 
     def pobierz_aktualizacje(self, link):
         """Pobiera instalator w tle; postęp: window.postepAktualizacji(procent), koniec: window.aktualizacjaPobrana(ok, tekst)."""
