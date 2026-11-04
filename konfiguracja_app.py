@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.3"
+VERSION = "4.0.4"
 BUILD_DATE = "2026-11-04 23:00"
 
 CHANGELOG = """
+v4.0.4 (2026-11-04)
+- Przy uruchomieniu, gdy jest nowa wersja, program od razu pyta: pobrać i zainstalować czy później (także po automatycznym logowaniu).
+
 v4.0.3 (2026-11-04)
 - Okno zawsze wczytuje aktualny interfejs: po aktualizacji nie zostaje stary wygląd z pamięci podręcznej okna.
 

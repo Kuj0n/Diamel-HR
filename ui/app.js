@@ -137,7 +137,7 @@ async function sprawdzAktualizacje(recznie) {
     if (!AKT?.ok) toast(`Nie udało się sprawdzić aktualizacji: ${esc(AKT?.blad || '')}`, 'blad');
     else if (AKT.do_instalacji) oknoAktualizacji();
     else toast(`Masz najnowszą wersję (${esc(INFO.wersja)}).`, 'ok');
-  }
+  } else if (AKT?.do_instalacji) oknoAktualizacji(); // przy starcie zawsze pytanie (także gdy zapisane logowanie od razu chowa ekran startowy)
 }
 
 async function oknoAktualizacji() {
