@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.2"
-BUILD_DATE = "2026-11-04 21:00"
+VERSION = "4.0.3"
+BUILD_DATE = "2026-11-04 23:00"
 
 CHANGELOG = """
+v4.0.3 (2026-11-04)
+- Okno zawsze wczytuje aktualny interfejs: po aktualizacji nie zostaje stary wygląd z pamięci podręcznej okna.
+
 v4.0.2 (2026-11-04)
 - Naprawa: przy otwartym Kalkulatorze Rozruchu okno Korektora pokazywało interfejs Kalkulatora (wspólny port okna) -
   każdy program Diamel ma teraz własny port.

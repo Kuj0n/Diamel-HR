@@ -26,6 +26,24 @@ PORT_OKNA = 42011
 CZEKAJ_NA_OKNO = 25  # sekund - potem awaryjne sprawdzenie aktualizacji bez interfejsu
 
 
+def bez_pamieci_podrecznej():
+    """
+    Pliki interfejsu zawsze świeże: pywebview ustawia "no-store", ale bottle.static_file zastępuje nagłówki odpowiedzi
+    (zostają tylko Last-Modified / ETag) - okno WebView2 brało wtedy pliki z pamięci podręcznej (np. stary app.js
+    po aktualizacji, a przy wspólnym porcie - interfejs innego programu). Do tego adres z numerem wersji (?v=).
+    """
+    import bottle
+    oryginal = bottle.static_file
+
+    def static_file(*a, **k):
+        odp = oryginal(*a, **k)
+        odp.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        odp.set_header("Pragma", "no-cache")
+        odp.set_header("Expires", "0")
+        return odp
+    bottle.static_file = static_file
+
+
 def wolny_port(preferowany):
     """Port serwera okna: własny programu, a gdy zajęty (drugie okno, inny program) - dowolny wolny, nigdy cudzy serwer."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -69,7 +87,7 @@ def main():
     except Exception:
         okno_poz = {}
     okno = webview.create_window(
-        f"Korektor Logów HR v{VERSION}", sciezka_do_zasobu(os.path.join("ui", "index.html")), js_api=api,
+        f"Korektor Logów HR v{VERSION}", sciezka_do_zasobu(os.path.join("ui", "index.html")) + f"?v={VERSION}", js_api=api,
         width=okno_poz.get("w", 1400), height=okno_poz.get("h", 900), min_size=(1100, 700),
         maximized=okno_poz.get("max", False), background_color="#0a1530", text_select=True,
     )
@@ -98,6 +116,7 @@ def main():
     threading.Thread(target=awaryjna_aktualizacja, args=(api,), daemon=True).start()
     okno.events.loaded += zaladowano
     okno.events.closing += zamykanie
+    bez_pamieci_podrecznej()
     webview.start(debug=os.environ.get("HR_DEBUG") == "1", private_mode=False, http_port=wolny_port(PORT_OKNA),
                   storage_path=os.path.join(KATALOG_DANYCH, "webview"))
 
