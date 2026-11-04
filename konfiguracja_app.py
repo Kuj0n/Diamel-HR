@@ -4,10 +4,15 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.1"
-BUILD_DATE = "2026-11-04 12:00"
+VERSION = "4.0.2"
+BUILD_DATE = "2026-11-04 21:00"
 
 CHANGELOG = """
+v4.0.2 (2026-11-04)
+- Naprawa: przy otwartym Kalkulatorze Rozruchu okno Korektora pokazywało interfejs Kalkulatora (wspólny port okna) -
+  każdy program Diamel ma teraz własny port.
+- Lista ignorowanych: pracownicy oznaczeni w panelu jako ignorowani lub niepracujący (pole "Ignorowany" w panelu).
+
 v4.0.1 (2026-11-04)
 - Raport PDF do wypełnienia na komputerze: pola "Poprawka" i "OK" działają w Edge / Acrobat (wpisz, zaznacz, zapisz plik), wydruk jak dotąd.
 
@@ -16,7 +21,7 @@ v4.0.0 (2026-11-04)
 - Ekran "Korekta logów": lista do sprawdzenia albo wszystkie wpisy, filtry (rodzaj problemu, działy, wyszukiwanie), skróty klawiszowe, przeciąganie plików na okno.
 - Korekta dnia w panelu z boku zamiast Menedżera danych: oś dnia, gotowe propozycje poprawek, "Zatwierdź i następny" (Enter), pytanie o niezapisane zmiany.
 - Przed zapisem pliku ERP pytanie o niesprawdzone pozycje: wróć, zapisz wszystko albo pomiń dni z błędami.
-- Reguły firmowe z panelu HR - takie same na wszystkich komputerach; zmiana u siebie widoczna jako lokalna, można ją zaproponować jako firmową.
+- Reguły firmowe z panelu diamel.pl - takie same na wszystkich komputerach; zmiana u siebie widoczna jako lokalna, można ją zaproponować jako firmową.
 - Raport braków w PDF pod drukarkę czarno-białą: według filtrów, z odbiciami danego dnia, miejscem na poprawkę i kratką do odhaczenia.
 - Historia przetworzeń z listą zapisanych plików poprawionych i raportów; zgłoszenie błędu z automatycznie dołączonymi plikami.
 - "Odśwież dane" z wyborem: baza pracowników i/lub reguły firmowe, z informacją, co się zmieniło.
@@ -183,7 +188,7 @@ _ANTI_FP_SALT = "D1AM3L_H4SH_SH1FT_V183_0X9A8B7C"
 # ==========================================
 # SERWER: aktualizacje (GitHub), lista pracowników i zgłoszenia (diamel.pl)
 # Program nie zawiera danych pracowników ani haseł - lista pracowników
-# jest pobierana po zalogowaniu (panel HR: diamel.pl/hr/panel/).
+# jest pobierana po zalogowaniu (panel: diamel.pl/panel).
 # ==========================================
 NAZWA_PROGRAMU = "hr"
 GITHUB_REPO = "Kuj0n/Diamel-HR"

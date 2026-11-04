@@ -777,7 +777,7 @@ function rysujReguly() {
         ${lok.length ? ' Zmiany oznaczone <span class="tag niepelny">●</span> obowiązują na tym komputerze.' : ''}</div>${lok.length ? '<button class="btn btn-maly btn-bez" id="r-przywroc">Przywróć domyślne</button>' : ''}</div>`}
     <div class="siatka k3">
       ${KARTY.map((k) => `<section class="karta"><h3>${ik(k.ikona)}${k.tytul}</h3><p class="opis">${k.opis}</p>${k.pola.map(rysujPole).join('')}</section>`).join('')}
-      <section class="karta"><h3>${ik('ludzie')}Pracownicy</h3><p class="opis">Przypisania zmian ustawia administrator w panelu HR</p>
+      <section class="karta"><h3>${ik('ludzie')}Pracownicy</h3><p class="opis">Przypisania zmian ustawia administrator w panelu diamel.pl</p>
         ${wierszListy('Ignorowani', 'bez raportu błędów', numery(REG.aktualne.pracownicy_ignorowani), numery(REG.niepracujacy_z_panelu).filter((n) => !numery(REG.aktualne.pracownicy_ignorowani).includes(n)))}
         ${LISTY_PANELU.map(([k, n]) => wierszListy(n, '', numery(REG.listy_z_panelu[k]))).join('')}
       </section>
@@ -793,14 +793,14 @@ function rysujReguly() {
   $('#r-zaproponuj')?.addEventListener('click', zaproponujReguly);
 }
 
-// Lista numerów tylko do odczytu (zmienia administrator w panelu HR): etykieta nad numerami, nazwisko po najechaniu myszką.
+// Lista numerów tylko do odczytu (zmienia administrator w panelu diamel.pl): etykieta nad numerami, nazwisko po najechaniu myszką.
 // Niepracujący z panelu (też pomijani w raporcie) - osobno, do rozwinięcia.
 function wierszListy(nazwa, mala, lista, niepracujacy = []) {
   const nazwisko = (nr) => PRACOWNICY.find((p) => p.nr === nr)?.nazwisko || '';
   const chip = (nr, kl = 'zablokowane') => `<span class="${kl}" title="${esc(nazwisko(nr) || 'brak na liście pracowników')}">${esc(nr)}</span>`;
   return `<div class="wiersz kolumna"><span class="et"><span>${nazwa}${mala ? ` <small style="display:inline">· ${mala}</small>` : ''}</span></span>
     <span class="chipy">${lista.map((nr) => chip(nr)).join('')}${!lista.length ? '<span class="podp">brak</span>' : ''}</span>
-    ${niepracujacy.length ? `<details class="rozwin"><summary>oraz ${niepracujacy.length} ${odmiana(niepracujacy.length, 'osoba oznaczona', 'osoby oznaczone', 'osób oznaczonych')} w panelu HR jako niepracujące</summary>
+    ${niepracujacy.length ? `<details class="rozwin"><summary>oraz ${niepracujacy.length} ${odmiana(niepracujacy.length, 'osoba oznaczona', 'osoby oznaczone', 'osób oznaczonych')} w panelu diamel.pl jako ignorowane lub niepracujące</summary>
       <span class="chipy">${niepracujacy.map((nr) => chip(nr, 'zablokowane przerywane')).join('')}</span></details>` : ''}</div>`;
 }
 
@@ -941,7 +941,7 @@ function rysujUstawienia() {
   $('#u-odswiez')?.addEventListener('click', async () => {
     const w = await modal({
       tytul: `${ik('odswiez')} Odśwież dane z serwera`,
-      tresc: `<p>Co pobrać z panelu HR na diamel.pl?</p>
+      tresc: `<p>Co pobrać z panelu na diamel.pl?</p>
         <div class="lista-wyboru">
           <label><input type="checkbox" id="o-prac" checked><span style="flex:1"><b style="font-weight:600">Baza pracowników</b><br><span class="podp">nazwiska, działy, przypisania zmian, niepracujący · teraz: ${liczba(KONTO.pracownikow)} osób${KONTO.wersja_bazy ? `, stan z ${esc(KONTO.wersja_bazy)}` : ''}</span></span></label>
           <label><input type="checkbox" id="o-reg" checked><span style="flex:1"><b style="font-weight:600">Reguły firmowe</b><br><span class="podp">zaokrąglanie, duplikaty, nadgodziny, ignorowani · teraz: ${REG.sa_firmowe ? esc(REG.wersja || 'tak') : 'brak - reguły domyślne'}</span></span></label>

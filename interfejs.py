@@ -32,14 +32,14 @@ PLIK_USTAWIEN = os.path.join(KATALOG_DANYCH, "ustawienia.json")
 PLIK_HISTORII = os.path.join(KATALOG_DANYCH, "historia.json")
 HISTORIA_MAX = 50
 
-# Reguły, których nie ustawia się w programie: listy zmian przychodzą z panelu HR (lista pracowników),
+# Reguły, których nie ustawia się w programie: listy zmian przychodzą z panelu (lista pracowników),
 # chk_raport (zawsze Menedżer danych) w nowym oknie nie ma znaczenia - lista do sprawdzenia jest zawsze widoczna
 NIE_REGULY = set(LISTY_ZMIAN) | {"chk_raport"}
-# Reguły, które zmienia tylko administrator (panel HR) - bez zmian lokalnych w programie
+# Reguły, które zmienia tylko administrator (panel) - bez zmian lokalnych w programie
 TYLKO_ADMIN = {"pracownicy_ignorowani"}
 
 KODY_KROTKO = {"00": "wejście", "16": "wyjście", "18": "przerwa", "25": "przepustka"}
-PULS_SEKUNDY = 120  # sygnał "program otwarty" dla panelu HR (Status -> Teraz)
+PULS_SEKUNDY = 120  # sygnał "program otwarty" dla panelu (Status -> Teraz)
 
 USTAWIENIA_PROGRAMU = {
     "motyw": "system",          # jasny / ciemny / system
@@ -116,7 +116,7 @@ class Api:
 
     def sprawdz_aktualizacje(self):
         """
-        Wersja zalecana = wydanie oznaczone na GitHub jako najnowsze (administrator może je zmienić w panelu HR).
+        Wersja zalecana = wydanie oznaczone na GitHub jako najnowsze (administrator może je zmienić w panelu).
         nowsza: jest nowsza wersja; wycofana: zalecana jest starsza niż zainstalowana (w tej wersji wykryto błąd) -
         w obu przypadkach do_instalacji. Działa bez logowania - poprawkę da się zainstalować, nawet gdy logowanie nie działa.
         """
@@ -221,7 +221,7 @@ class Api:
                 "login": odp.get("login") or self.program.get("login", ""), "reguly_wersja": self.reguly_wersja, "zmiany": zmiany}
 
     def _start_puls(self):
-        """Co 2 minuty informuje serwer, że program jest otwarty (panel HR pokazuje "sesja otwarta")."""
+        """Co 2 minuty informuje serwer, że program jest otwarty (panel pokazuje "sesja otwarta")."""
         if getattr(self, "_puls", None):
             return
         self._puls = threading.Event()
