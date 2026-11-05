@@ -372,3 +372,13 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 @keyframes wjedz { from { transform: translateX(40px); opacity: 0; } }
 @keyframes unies { from { transform: translateY(8px); opacity: 0; } }
 @keyframes obrot { to { transform: rotate(360deg); } }
+
+/* Filtr pracowników: lista z wyszukiwaniem */
+.rozwijane .panel-pracownikow { width: 400px; max-height: none; overflow: visible; }
+.panel-pracownikow .gora-listy { display: flex; gap: 6px; align-items: center; }
+.panel-pracownikow .gora-listy .pole { flex: 1; min-width: 0; padding: 6px 9px; font-size: 0.84rem; }
+.panel-pracownikow .przewijana-prac { max-height: 340px; overflow: auto; }
+.panel-pracownikow label { display: flex; align-items: center; gap: 8px; }
+.panel-pracownikow label > span { flex: 1; min-width: 0; }
+.rozwijane .panel-pracownikow label > span small { color: var(--muted); margin-left: 4px; }
+.panel-pracownikow label.ukryty { display: none; }

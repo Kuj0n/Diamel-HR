@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.4"
-BUILD_DATE = "2026-11-04 23:00"
+VERSION = "4.0.5"
+BUILD_DATE = "2026-11-05 14:00"
 
 CHANGELOG = """
+v4.0.5 (2026-11-05)
+- Filtr „Pracownicy” na pulpicie: zaznacz osoby (z wyszukiwaniem), a lista i raport błędów PDF / TXT obejmą tylko je.
+
 v4.0.4 (2026-11-04)
 - Przy uruchomieniu, gdy jest nowa wersja, program od razu pyta: pobrać i zainstalować czy później (także po automatycznym logowaniu).
 
