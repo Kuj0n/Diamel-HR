@@ -382,3 +382,13 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .pasek-zaznaczenia svg { width: 16px; height: 16px; color: var(--kolor); }
 .pasek-zaznaczenia span { flex: 1; }
 .licznik-zazn { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--kolor); color: var(--na-kolorze); font-size: 0.78rem; font-weight: 700; }
+
+/* Zakładka Pracownicy: propozycje zmian */
+.pasek-szukania { display: flex; align-items: center; gap: 14px; margin: 14px 0 10px; }
+.pasek-szukania .pole { width: 320px; }
+.przewijana-tab { max-height: calc(100vh - 290px); overflow: auto; border-top: 1px solid var(--linia); }
+.tag.ok-tag { color: var(--zielony-tekst); }
+.formularz-prop { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.formularz-prop .pole, .tresc-modala textarea.pole, .tresc-modala input[type=date].pole { width: 100%; box-sizing: border-box; }
+.lista-propozycji { margin: 0 0 10px; padding-left: 18px; line-height: 1.7; }
+.naglowek-karty { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }

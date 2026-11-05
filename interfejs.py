@@ -316,6 +316,27 @@ class Api:
             return {"ok": False, "blad": f"Brak połączenia z serwerem: {e}"}
         return {"ok": bool(odp.get("ok")), "blad": odp.get("blad", "")}
 
+    def baza_pracownikow(self):
+        """Pracownicy z panelu (do zakładki Pracownicy): numer, nazwisko, dział, ignorowany, okres sprawdzania (od / do)."""
+        d = self.dane_serwera
+        ignorowani = {x.strip() for x in str(d.get("ignorowani", "")).replace(";", ",").split(",") if x.strip()}
+        okresy = d.get("okresy") or {}
+        return {"pracownicy": [{"nr": nr, "nazwisko": n, "dzial": (d.get("dzialy") or {}).get(nr, ""), "ignorowany": nr in ignorowani,
+                                "od": (okresy.get(nr) or {}).get("od", "").replace(".", "-"), "do": (okresy.get(nr) or {}).get("do", "").replace(".", "-")}
+                               for nr, n in sorted((d.get("pracownicy") or {}).items(), key=lambda x: x[1].lower())],
+                "dzialy": self.dzialy(), "wersja": d.get("wersja", ""), "zalogowany": bool(getattr(self, "_token", None) or serwer_hr.wczytaj_token())}
+
+    def zaproponuj_pracownika(self, propozycja):
+        """Propozycja dodania / zmiany / odejścia pracownika - administrator przyjmuje ją w panelu (zmiana trafia do wszystkich)."""
+        token = getattr(self, "_token", None) or serwer_hr.wczytaj_token()
+        if not token:
+            return {"ok": False, "blad": "Zaloguj się, aby wysłać propozycję."}
+        try:
+            odp = serwer_hr.zapytanie({"akcja": "zaproponuj_pracownika", "token": token, "propozycja": propozycja, "komputer": platform.node()})
+        except Exception as e:
+            return {"ok": False, "blad": f"Brak połączenia z serwerem: {e}"}
+        return {"ok": bool(odp.get("ok")), "blad": odp.get("blad", ""), "zaloguj": bool(odp.get("zaloguj"))}
+
     # ------------------------------------------------------------------ pliki
 
     def wybierz_plik_rcp(self):

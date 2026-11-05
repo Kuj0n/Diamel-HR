@@ -20,7 +20,9 @@ logging.getLogger("fontTools").setLevel(logging.ERROR)  # Segoe UI: niegroźne k
 
 CZCIONKI = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
 # Problem + odbicia z dnia, Poprawka = miejsce na ręczny wpis (co wprowadzić w ERP), OK = kratka po wprowadzeniu
-KOLUMNY = [("", 6), ("Data", 14), ("Nr", 11), ("Pracownik", 25), ("Zmiana", 16), ("Problem", 66), ("Poprawka", 38), ("OK", 6)]
+# A4 poziomo: szerokość treści SZER, prawa krawędź PRAWA, dół treści DOL (nad stopką) - więcej miejsca na opis i poprawkę
+SZER, PRAWA, DOL = 269, 283, 192
+KOLUMNY = [("", 7), ("Data", 17), ("Nr", 13), ("Pracownik", 38), ("Zmiana", 21), ("Problem", 85), ("Poprawka", 80), ("OK", 8)]
 
 
 def _data(d):
@@ -34,7 +36,7 @@ def _zmiana(typ):
 
 class _Pdf(FPDF):
     def __init__(self, stopka_lewa):
-        super().__init__(format="A4")
+        super().__init__(orientation="L", format="A4")
         self.stopka_lewa = stopka_lewa
         self.add_font("txt", "", os.path.join(CZCIONKI, "segoeui.ttf"))
         self.add_font("txt", "B", os.path.join(CZCIONKI, "segoeuib.ttf"))
@@ -48,12 +50,12 @@ class _Pdf(FPDF):
         self.set_y(-13)
         self.set_draw_color(0)
         self.set_line_width(0.2)
-        self.line(14, self.get_y(), 196, self.get_y())
-        self.set_font("txt", "", 7)
+        self.line(14, self.get_y(), PRAWA, self.get_y())
+        self.set_font("txt", "", 7.5)
         self.set_text_color(60)
         self.set_y(-12)
-        self.cell(150, 4, self.stopka_lewa[:180])
-        self.cell(32, 4, f"Strona {self.page_no()} z {{nb}}", align="R")
+        self.cell(SZER - 40, 4, self.stopka_lewa[:220])
+        self.cell(40, 4, f"Strona {self.page_no()} z {{nb}}", align="R")
 
 
 def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=False, kratki=True,
@@ -68,54 +70,54 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
 
     # Nagłówek
     pdf.set_text_color(0)
-    pdf.set_font("txt", "B", 17)
-    pdf.cell(120, 9, "Raport braków odbić")
-    pdf.set_font("txt", "B", 10)
-    pdf.cell(62, 5, "DIAMEL", align="R", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("txt", "B", 19)
+    pdf.cell(SZER - 70, 9, "Raport braków odbić")
+    pdf.set_font("txt", "B", 11)
+    pdf.cell(70, 5, "DIAMEL", align="R", new_x="LMARGIN", new_y="NEXT")
     y = pdf.get_y()
-    pdf.set_font("txt", "", 8)
+    pdf.set_font("txt", "", 8.5)
     pdf.set_text_color(50)
-    pdf.set_xy(134, y - 0.5)
-    pdf.multi_cell(62, 3.6, f"Korektor Logów HR v{wersja}\nwygenerowano {datetime.now():%d.%m.%Y %H:%M}" + (f" · {uzytkownik}" if uzytkownik else ""), align="R")
+    pdf.set_xy(PRAWA - 70, y - 0.5)
+    pdf.multi_cell(70, 3.9, f"Korektor Logów HR v{wersja}\nwygenerowano {datetime.now():%d.%m.%Y %H:%M}" + (f" · {uzytkownik}" if uzytkownik else ""), align="R")
     pdf.set_xy(14, y + 4)
-    pdf.set_font("txt", "", 9)
+    pdf.set_font("txt", "", 10)
     okres = f"Okres {statystyki['od'].replace('.', '-')} – {statystyki['do'].replace('.', '-')}" if statystyki.get("od") else ""
-    pdf.cell(120, 5, f"{okres} · plik {plik}")
+    pdf.cell(SZER - 75, 5, f"{okres} · plik {plik}")
     pdf.set_y(y + 10)
     pdf.set_line_width(0.7)
-    pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+    pdf.line(14, pdf.get_y(), PRAWA, pdf.get_y())
 
     # Liczby
     pdf.ln(3.5)
     y = pdf.get_y()
     pola = [("PRACOWNIKÓW", statystyki["pracownikow"]), ("ZDARZEŃ W PLIKU", statystyki["zdarzen"]),
             ("KOREKT AUTOMATYCZNYCH", statystyki["skorygowane"]), ("DO SPRAWDZENIA", len(anomalie))]
-    szer = 182 / len(pola)
+    szer = SZER / len(pola)
     pdf.set_line_width(0.3)
-    pdf.rect(14, y, 182, 13)
+    pdf.rect(14, y, SZER, 13)
     for i, (etykieta, wartosc) in enumerate(pola):
         x = 14 + i * szer
         if i:
             pdf.line(x, y, x, y + 13)
         pdf.set_xy(x + 3, y + 1.8)
-        pdf.set_font("txt", "", 6.5)
+        pdf.set_font("txt", "", 7)
         pdf.set_text_color(70)
         pdf.cell(szer - 6, 3, etykieta)
         pdf.set_xy(x + 3, y + 5.5)
-        pdf.set_font("txt", "B", 12)
+        pdf.set_font("txt", "B", 13)
         pdf.set_text_color(0)
         pdf.cell(szer - 6, 6, f"{wartosc:,}".replace(",", " "))
     pdf.set_y(y + 16)
 
     # Legenda
-    pdf.set_font("txt", "B", 8)
-    pdf.cell(4, 4, "X")
-    pdf.set_font("txt", "", 8)
-    pdf.cell(55, 4, "błąd - wymaga korekty przed importem")
-    pdf.set_font("txt", "B", 8)
-    pdf.cell(3, 4, "!")
-    pdf.set_font("txt", "", 8)
-    pdf.cell(40, 4, "ostrzeżenie - do sprawdzenia")
+    pdf.set_font("txt", "B", 9)
+    pdf.cell(4, 4.5, "X")
+    pdf.set_font("txt", "", 9)
+    pdf.cell(64, 4.5, "błąd - wymaga korekty przed importem")
+    pdf.set_font("txt", "B", 9)
+    pdf.cell(3, 4.5, "!")
+    pdf.set_font("txt", "", 9)
+    pdf.cell(48, 4.5, "ostrzeżenie - do sprawdzenia")
     if kratki:
         pdf.rect(pdf.get_x() + 1, pdf.get_y() + 0.8, 2.6, 2.6)
         pdf.set_x(pdf.get_x() + 5)
@@ -141,70 +143,70 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
         grupy.setdefault(a["dzial"] if a["dzial"] not in ("", "---") else "Bez działu", []).append(a)
 
     def naglowek_tabeli():
-        pdf.set_font("txt", "B", 6.8)
+        pdf.set_font("txt", "B", 7.5)
         pdf.set_text_color(0)
         for nazwa, w in KOLUMNY:
-            pdf.cell(w, 5, nazwa.upper(), border="B")
+            pdf.cell(w, 5.5, nazwa.upper(), border="B")
         pdf.ln()
 
     for dzial, pozycje in grupy.items():
-        if pdf.get_y() > 255:
+        if pdf.get_y() > DOL - 26:
             pdf.add_page()
         pdf.ln(3)
         pdf.set_fill_color(228)
-        pdf.set_font("txt", "B", 10)
+        pdf.set_font("txt", "B", 11)
         y = pdf.get_y()
-        pdf.cell(182, 6.5, "  " + dzial, fill=True)
-        pdf.set_font("txt", "", 8)
+        pdf.cell(SZER, 7, "  " + dzial, fill=True)
+        pdf.set_font("txt", "", 9)
         pdf.set_x(14)
-        pdf.cell(180, 6.5, f"{len(pozycje)} {'pozycja' if len(pozycje) == 1 else 'pozycje' if 2 <= len(pozycje) % 10 <= 4 and not 12 <= len(pozycje) % 100 <= 14 else 'pozycji'}", align="R")
+        pdf.cell(SZER - 2, 7, f"{len(pozycje)} {'pozycja' if len(pozycje) == 1 else 'pozycje' if 2 <= len(pozycje) % 10 <= 4 and not 12 <= len(pozycje) % 100 <= 14 else 'pozycji'}", align="R")
         pdf.set_fill_color(0)
-        pdf.rect(14, y, 1, 6.5, style="F")
-        pdf.ln(7.5)
+        pdf.rect(14, y, 1, 7, style="F")
+        pdf.ln(8)
         naglowek_tabeli()
         for i, a in enumerate(pozycje):
             blad = a["rodzaj"] == "blad"
             problem = a["uwaga"].replace("Ostrzeżenie: ", "")
             odbicia = a.get("odbicia") or "brak odbić"
-            pdf.set_font("txt", "B" if blad else "I", 8)
-            linie = max(1, len(pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L", dry_run=True, output="LINES")))
-            pdf.set_font("txt", "", 7)
-            linie_odb = len(pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L", dry_run=True, output="LINES"))
-            h = max(13, 4 * linie + 3.3 * linie_odb + 2)  # min. wysokość: dwie linijki na ręczny wpis
-            if pdf.get_y() + h > 279:
+            pdf.set_font("txt", "B" if blad else "I", 9)
+            linie = max(1, len(pdf.multi_cell(KOLUMNY[5][1] - 1, 4.5, problem, align="L", dry_run=True, output="LINES")))
+            pdf.set_font("txt", "", 8)
+            linie_odb = len(pdf.multi_cell(KOLUMNY[5][1] - 1, 3.8, odbicia, align="L", dry_run=True, output="LINES"))
+            h = max(15, 4.5 * linie + 3.8 * linie_odb + 2)  # min. wysokość: trzy linijki na ręczny wpis
+            if pdf.get_y() + h > DOL:
                 pdf.add_page()
                 naglowek_tabeli()
             y = pdf.get_y()
             if i % 2:
                 pdf.set_fill_color(244)
-                pdf.rect(14, y, 182, h, style="F")
+                pdf.rect(14, y, SZER, h, style="F")
             pdf.set_draw_color(185)
             pdf.set_line_width(0.15)
-            pdf.line(14, y + h, 196, y + h)
+            pdf.line(14, y + h, PRAWA, y + h)
             pdf.set_draw_color(0)
             x = 14
-            komorki = [("txt", "B", 8.5, "X" if blad else "!", "C"), ("mono", "", 7.8, _data(a["data"]), ""),
-                       ("mono", "", 7.8, a["pracownik"], ""), ("txt", "", 8, a["nazwisko"], ""),
-                       ("txt", "", 8, _zmiana(a["typ_zmiany"]), "")]
+            komorki = [("txt", "B", 9.5, "X" if blad else "!", "C"), ("mono", "", 8.8, _data(a["data"]), ""),
+                       ("mono", "", 8.8, a["pracownik"], ""), ("txt", "", 9, a["nazwisko"], ""),
+                       ("txt", "", 9, _zmiana(a["typ_zmiany"]), "")]
             for nr_kol, ((font, styl, rozmiar, tekst, wyr), (_, w)) in enumerate(zip(komorki, KOLUMNY)):
                 pdf.set_font(font, styl, rozmiar)
                 pdf.set_xy(x, y + 0.8)
                 if nr_kol == 3:
                     # Nazwisko w pierwszej linijce, imię (reszta) w drugiej - węższa kolumna, więcej miejsca na problem
                     nazwisko, _, imie = str(tekst).partition(" ")
-                    pdf.cell(w, 4, pdf_skroc(pdf, nazwisko, w - 1))
-                    pdf.set_xy(x, y + 4.6)
-                    pdf.cell(w, 4, pdf_skroc(pdf, imie, w - 1))
+                    pdf.cell(w, 4.5, pdf_skroc(pdf, nazwisko, w - 1))
+                    pdf.set_xy(x, y + 5.1)
+                    pdf.cell(w, 4.5, pdf_skroc(pdf, imie, w - 1))
                 else:
-                    pdf.cell(w, 4, pdf_skroc(pdf, tekst, w - 1), align=wyr or "L")
+                    pdf.cell(w, 4.5, pdf_skroc(pdf, tekst, w - 1), align=wyr or "L")
                 x += w
-            pdf.set_font("txt", "B" if blad else "I", 8)
+            pdf.set_font("txt", "B" if blad else "I", 9)
             pdf.set_xy(x, y + 0.8)
-            pdf.multi_cell(KOLUMNY[5][1] - 1, 4, problem, align="L")
-            pdf.set_font("txt", "", 7)
+            pdf.multi_cell(KOLUMNY[5][1] - 1, 4.5, problem, align="L")
+            pdf.set_font("txt", "", 8)
             pdf.set_text_color(40)
             pdf.set_x(x)
-            pdf.multi_cell(KOLUMNY[5][1] - 1, 3.3, odbicia, align="L")
+            pdf.multi_cell(KOLUMNY[5][1] - 1, 3.8, odbicia, align="L")
             pdf.set_text_color(0)
             x += KOLUMNY[5][1]
             # Ramka na poprawkę: do wpisania na komputerze (pole formularza) albo ręcznie po wydruku
@@ -217,8 +219,8 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             x += KOLUMNY[6][1]
             if kratki:
                 pdf.set_line_width(0.25)
-                pdf.rect(x + 1.2, y + 1.4, 2.8, 2.8)
-                pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": x + 1.2, "y": y + 1.4, "w": 2.8, "h": 2.8,
+                pdf.rect(x + 1.6, y + 1.4, 3.6, 3.6)
+                pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": x + 1.6, "y": y + 1.4, "w": 3.6, "h": 3.6,
                              "nazwa": f"ok_{len(pola_formularza)}", "zaznaczone": bool(a.get("status")), "opis": f"OK: {a['pracownik']} {_data(a['data'])}"})
             pdf.set_xy(14, y + h)
 
@@ -230,11 +232,11 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
     if pominiete:
         nazwiska = nazwiska or {}
         pdf.ln(5)
-        pdf.set_font("txt", "B", 10)
+        pdf.set_font("txt", "B", 11)
         pdf.cell(0, 6, "Pominięte w pliku ERP (niepoprawione błędy)", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("txt", "", 8)
+        pdf.set_font("txt", "", 9)
         for d, nr in pominiete:
-            pdf.cell(0, 4.4, f"{_data(d)}.{d[:4]}   {nr}   {nazwiska.get(nr, '---')}", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 4.8, f"{_data(d)}.{d[:4]}   {nr}   {nazwiska.get(nr, '---')}", new_x="LMARGIN", new_y="NEXT")
 
     if nieobecnosci:
         # Pracownik (numer, nazwisko, dział), pod nim jego dni bez odbić - każdy dzień z polem na wpis (np. powód, kod
@@ -242,47 +244,47 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
         osoby = OrderedDict()
         for a in sorted(nieobecnosci, key=lambda a: (a["dzial"], a["pracownik"], a["data"])):
             osoby.setdefault((a["pracownik"], a["nazwisko"], a["dzial"]), []).append(a)
-        if pdf.get_y() > 245:
+        if pdf.get_y() > DOL - 34:
             pdf.add_page()
         pdf.ln(5)
-        pdf.set_font("txt", "B", 10)
+        pdf.set_font("txt", "B", 11)
         pdf.cell(0, 6, f"Nieobecności bez wpisu w planie urlopów ({len(nieobecnosci)} dni)", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("txt", "", 7.5)
+        pdf.set_font("txt", "", 8.5)
         pdf.set_text_color(60)
-        pdf.cell(0, 4, "Dni robocze bez żadnego odbicia. Przy każdym dniu: pole na wpis (np. powód, kod nieobecności) i kratka"
+        pdf.cell(0, 4.5, "Dni robocze bez żadnego odbicia. Przy każdym dniu: pole na wpis (np. powód, kod nieobecności) i kratka"
                        + (" do odhaczenia." if kratki else "."), new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0)
         pdf.ln(1)
-        kol, szer_kol, h_dnia = 3, 182 / 3, 6.2
+        kol, szer_kol, h_dnia = 4, SZER / 4, 7
         for (nr, nazwisko, dzial), dni in osoby.items():
             wiersze = -(-len(dni) // kol)
-            if pdf.get_y() + 5.5 + min(wiersze, 2) * h_dnia > 279:
+            if pdf.get_y() + 6 + min(wiersze, 2) * h_dnia > DOL:
                 pdf.add_page()
             y = pdf.get_y()
             pdf.set_fill_color(236)
-            pdf.rect(14, y, 182, 5.2, style="F")
-            pdf.set_xy(15, y + 0.5)
-            pdf.set_font("mono", "", 7.8)
-            pdf.cell(11, 4.2, nr)
-            pdf.set_font("txt", "B", 8)
-            pdf.cell(60, 4.2, pdf_skroc(pdf, nazwisko, 59))
-            pdf.set_font("txt", "", 7.5)
+            pdf.rect(14, y, SZER, 5.8, style="F")
+            pdf.set_xy(15, y + 0.6)
+            pdf.set_font("mono", "", 8.8)
+            pdf.cell(13, 4.6, nr)
+            pdf.set_font("txt", "B", 9)
+            pdf.cell(80, 4.6, pdf_skroc(pdf, nazwisko, 79))
+            pdf.set_font("txt", "", 8.5)
             pdf.set_text_color(60)
-            pdf.cell(80, 4.2, pdf_skroc(pdf, dzial, 79))
-            pdf.cell(29, 4.2, f"{len(dni)} {'dzień' if len(dni) == 1 else 'dni'}", align="R")
+            pdf.cell(120, 4.6, pdf_skroc(pdf, dzial, 119))
+            pdf.cell(SZER - 215, 4.6, f"{len(dni)} {'dzień' if len(dni) == 1 else 'dni'}", align="R")
             pdf.set_text_color(0)
-            pdf.set_y(y + 5.8)
+            pdf.set_y(y + 6.4)
             for w in range(wiersze):
-                if pdf.get_y() + h_dnia > 279:
+                if pdf.get_y() + h_dnia > DOL:
                     pdf.add_page()
                 y = pdf.get_y()
                 for k, a in enumerate(dni[w * kol:(w + 1) * kol]):
                     x = 14 + k * szer_kol
-                    pdf.set_font("mono", "", 7.6)
-                    pdf.set_xy(x + 1, y + 1)
+                    pdf.set_font("mono", "", 8.6)
+                    pdf.set_xy(x + 1, y + 1.3)
                     dt = datetime.strptime(a["data"], "%Y.%m.%d")
-                    pdf.cell(17, 4, f"{_data(a['data'])} {['pn', 'wt', 'śr', 'cz', 'pt', 'so', 'nd'][dt.weekday()]}")
-                    xp, wp = x + 18.5, szer_kol - (25 if kratki else 20)
+                    pdf.cell(20, 4.5, f"{_data(a['data'])} {['pn', 'wt', 'śr', 'cz', 'pt', 'so', 'nd'][dt.weekday()]}")
+                    xp, wp = x + 21, szer_kol - (29 if kratki else 23)
                     pdf.set_draw_color(170)
                     pdf.set_line_width(0.2)
                     pdf.rect(xp, y + 0.6, wp, h_dnia - 1.2)
@@ -290,33 +292,33 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
                     pola_formularza.append({"typ": "tekst", "strona": pdf.page_no(), "x": xp, "y": y + 0.6, "w": wp, "h": h_dnia - 1.2,
                                             "nazwa": f"nieob_{len(pola_formularza)}", "opis": f"Nieobecność: {nr} {_data(a['data'])}"})
                     if kratki:
-                        xk = xp + wp + 1.8
+                        xk = xp + wp + 2
                         pdf.set_line_width(0.25)
-                        pdf.rect(xk, y + 1.7, 2.8, 2.8)
-                        pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": xk, "y": y + 1.7, "w": 2.8, "h": 2.8,
+                        pdf.rect(xk, y + 1.7, 3.6, 3.6)
+                        pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": xk, "y": y + 1.7, "w": 3.6, "h": 3.6,
                                                 "nazwa": f"nieob_ok_{len(pola_formularza)}", "zaznaczone": bool(a.get("status")),
                                                 "opis": f"OK nieobecność: {nr} {_data(a['data'])}"})
                 pdf.set_y(y + h_dnia)
             pdf.set_draw_color(205)
             pdf.set_line_width(0.15)
-            pdf.line(14, pdf.get_y() + 0.6, 196, pdf.get_y() + 0.6)
+            pdf.line(14, pdf.get_y() + 0.6, PRAWA, pdf.get_y() + 0.6)
             pdf.set_draw_color(0)
             pdf.ln(2)
 
     if podpisy:
-        if pdf.get_y() > 250:
+        if pdf.get_y() > DOL - 28:
             pdf.add_page()
         pdf.ln(18)
         y = pdf.get_y()
         pdf.set_line_width(0.3)
-        pdf.line(14, y, 92, y)
-        pdf.line(118, y, 196, y)
+        pdf.line(14, y, 120, y)
+        pdf.line(PRAWA - 106, y, PRAWA, y)
         pdf.set_font("txt", "", 8)
         pdf.set_text_color(50)
         pdf.set_xy(14, y + 1)
-        pdf.cell(78, 4, "Sprawdził(a) - data i podpis")
-        pdf.set_xy(118, y + 1)
-        pdf.cell(78, 4, "Zatwierdził(a) - data i podpis")
+        pdf.cell(106, 4, "Sprawdził(a) - data i podpis")
+        pdf.set_xy(PRAWA - 106, y + 1)
+        pdf.cell(106, 4, "Zatwierdził(a) - data i podpis")
 
     pdf.output(sciezka)
     dodaj_pola(sciezka, pola_formularza)
@@ -358,7 +360,7 @@ def dodaj_pola(sciezka, pola):
                                  NameObject("/F"): NumberObject(4), NameObject("/P"): strona.indirect_reference})
         if p["typ"] == "tekst":
             pole.update({NameObject("/FT"): NameObject("/Tx"), NameObject("/Ff"): NumberObject(4096),  # wielowierszowe
-                         NameObject("/DA"): TextStringObject("/Helv 8 Tf 0 g"), NameObject("/V"): TextStringObject(""),
+                         NameObject("/DA"): TextStringObject("/Helv 10 Tf 0 g"), NameObject("/V"): TextStringObject(""),
                          NameObject("/MK"): DictionaryObject()})
         else:
             szer, wys = x1 - x0, y1 - y0
@@ -376,7 +378,7 @@ def dodaj_pola(sciezka, pola):
         pola_pdf.append(ref)
     w._root_object[NameObject("/AcroForm")] = DictionaryObject({
         NameObject("/Fields"): pola_pdf, NameObject("/NeedAppearances"): BooleanObject(True),
-        NameObject("/DA"): TextStringObject("/Helv 8 Tf 0 g"),
+        NameObject("/DA"): TextStringObject("/Helv 10 Tf 0 g"),
         NameObject("/DR"): DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/Helv"): helv, NameObject("/ZaDb"): zadb})})})
     w.write(sciezka)
 

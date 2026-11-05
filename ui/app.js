@@ -226,7 +226,7 @@ function odswiezDol() {
 const TYTULY = {
   pulpit: ['Korektor Logów HR', 'Korekta logów czasu pracy'], reguly: ['Ustawienia korekty', 'Reguły korekty'],
   historia: ['Ostatnio przetwarzane', 'Historia przetworzeń'],
-  ustawienia: ['Program', 'Ustawienia'], zglos: ['Pomoc', 'Zgłoś błąd'],
+  ustawienia: ['Program', 'Ustawienia'], zglos: ['Pomoc', 'Zgłoś błąd'], pracownicy: ['Baza pracowników z panelu', 'Pracownicy'],
 };
 function pokaz(w) {
   widok = w;
@@ -235,7 +235,7 @@ function pokaz(w) {
   $('#pasek-nad').textContent = TYTULY[w][0];
   $('#pasek-tytul').textContent = TYTULY[w][1];
   $('#pasek-prawe').innerHTML = '';
-  ({ pulpit: rysujPulpit, reguly: rysujReguly, historia: rysujHistorie, ustawienia: rysujUstawienia, zglos: rysujZgloszenie })[w]();
+  ({ pulpit: rysujPulpit, reguly: rysujReguly, historia: rysujHistorie, ustawienia: rysujUstawienia, zglos: rysujZgloszenie, pracownicy: rysujPracownikow })[w]();
 }
 $$('.poz').forEach((p) => p.addEventListener('click', async () => { if (await moznaOpuscicDzien()) { zamknijSzuflade(); pokaz(p.dataset.widok); } }));
 $$('#motyw button').forEach((b) => b.addEventListener('click', () => zmienProgram('motyw', b.dataset.motyw).then(() => widok === 'ustawienia' && rysujUstawienia())));
@@ -1027,6 +1027,95 @@ function rysujUstawienia() {
 
 // ------------------------------------------------------------------ zgłoszenie błędu
 let dodatkowe = [];
+// ------------------------------------------------------------------ pracownicy: propozycje zmian dla administratora
+const prac = { szukaj: '', dane: null };
+const dataPl = (d) => (d ? d.split('-').reverse().join('.') : '');
+const dzisiaj = () => new Date().toISOString().slice(0, 10);
+
+async function rysujPracownikow() {
+  const el = $('#widok-pracownicy');
+  prac.dane = await api('baza_pracownikow');
+  const d = prac.dane;
+  if (!d) return;
+  if (!d.zalogowany || !d.pracownicy.length) {
+    el.innerHTML = `<div class="karta"><h3>${ik('ludzie')}Pracownicy</h3><p class="opis">${d.zalogowany ? 'Lista pracowników z panelu jest pusta.' : 'Zaloguj się kontem Diamel, aby zobaczyć listę pracowników z panelu i proponować zmiany.'}</p>
+      ${d.zalogowany ? '' : '<button class="btn btn-hr" id="pr-zaloguj">Zaloguj</button>'}</div>`;
+    $('#pr-zaloguj')?.addEventListener('click', () => ekranLogowania());
+    return;
+  }
+  el.innerHTML = `<div class="karta">
+      <div class="naglowek-karty"><div><h3 style="margin:0">${ik('ludzie')}Baza pracowników</h3><p class="opis" style="margin:4px 0 0">Zmiany w bazie zapisuje administrator. Wyślij propozycję - po zatwierdzeniu w panelu trafi do wszystkich komputerów.</p></div>
+        <button class="btn btn-hr" id="pr-dodaj">${ik('plus')} Zaproponuj nowego pracownika</button></div>
+      <div class="pasek-szukania"><input class="pole" id="pr-szukaj" placeholder="Szukaj: nazwisko, numer, dział…" value="${esc(prac.szukaj)}" spellcheck="false">
+        <span class="podp">${d.pracownicy.length} pracowników · stan bazy ${esc(d.wersja || '-')}</span></div>
+      <div class="przewijana-tab"><table class="tab"><thead><tr><th>Nr</th><th>Nazwisko i imię</th><th>Dział</th><th>Stan</th><th></th></tr></thead><tbody id="pr-lista"></tbody></table></div>
+    </div>`;
+  const lista = () => {
+    const q = prac.szukaj.trim().toLowerCase();
+    $('#pr-lista').innerHTML = d.pracownicy.filter((p) => !q || `${p.nazwisko} ${p.nr} ${p.dzial}`.toLowerCase().includes(q)).map((p) => `
+      <tr class="${p.do || p.ignorowany ? 'sprawdzony' : ''}"><td class="nr">${esc(p.nr)}</td><td class="nazwisko">${esc(p.nazwisko)}</td><td class="dzial">${esc(p.dzial || '—')}</td>
+        <td>${p.do ? `<span class="tag">nie pracuje od ${dataPl(p.do)}</span>` : p.ignorowany ? '<span class="tag">ignorowany / nie pracuje</span>' : '<span class="tag ok-tag">pracuje</span>'}${p.od ? ` <span class="tag">sprawdzany od ${dataPl(p.od)}</span>` : ''}</td>
+        <td style="text-align:right; white-space:nowrap"><button class="btn btn-maly" data-pr-zmien="${esc(p.nr)}">Zmień dane</button>
+          ${p.do || p.ignorowany ? '' : `<button class="btn btn-maly" data-pr-odejscie="${esc(p.nr)}">Nie pracuje</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="pusto">Brak pracowników dla wyszukiwania.</td></tr>';
+    $$('[data-pr-zmien]').forEach((b) => b.onclick = () => oknoPropozycji('zmien', d.pracownicy.find((p) => p.nr === b.dataset.prZmien)));
+    $$('[data-pr-odejscie]').forEach((b) => b.onclick = () => oknoPropozycji('odejscie', d.pracownicy.find((p) => p.nr === b.dataset.prOdejscie)));
+  };
+  lista();
+  $('#pr-szukaj').oninput = (e) => { prac.szukaj = e.target.value; lista(); };
+  $('#pr-dodaj').onclick = () => oknoPropozycji('dodaj');
+}
+
+/** Formularz propozycji (dodanie / zmiana danych / odejście), potem pytanie, czy wysłać do administratora. */
+async function oknoPropozycji(typ, p = null) {
+  const dzialy = `<datalist id="pr-dzialy">${(prac.dane?.dzialy || []).map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
+  const tytul = { dodaj: 'Nowy pracownik', zmien: `Zmiana danych: ${esc(p?.nazwisko)}`, odejscie: `Nie pracuje: ${esc(p?.nazwisko)}` }[typ];
+  const pole = (id, et, html) => `<div><label class="etykieta" for="${id}">${et}</label>${html}</div>`;
+  const tresc = typ === 'odejscie'
+    ? `<p class="podp" style="margin-top:0">${esc(p.nr)} · ${esc(p.dzial || 'bez działu')}</p>
+       ${pole('pr-do', 'Nie pracuje od dnia', `<input class="pole" type="date" id="pr-do" value="${dzisiaj()}">`)}
+       <p class="podp">Do dnia wcześniej pracownik jest sprawdzany normalnie, od tej daty - pomijany (bez nieobecności).</p>`
+    : `${dzialy}<div class="formularz-prop">
+       ${pole('pr-nazwisko', 'Nazwisko i imię', `<input class="pole" id="pr-nazwisko" value="${esc(p?.nazwisko || '')}" spellcheck="false" placeholder="np. Kowalski Jan">`)}
+       ${pole('pr-dzial', 'Dział', `<input class="pole" id="pr-dzial" list="pr-dzialy" value="${esc(p?.dzial || '')}" placeholder="wybierz albo wpisz">`)}
+       ${typ === 'dodaj' ? pole('pr-nr', 'Numer w Roger RCP (jeśli znany)', '<input class="pole" id="pr-nr" inputmode="numeric" placeholder="np. 0123">') : ''}
+       ${pole('pr-od', 'Sprawdzany od dnia', `<input class="pole" type="date" id="pr-od" value="${typ === 'dodaj' ? dzisiaj() : p?.od || ''}">`)}</div>
+       <p class="podp">${typ === 'dodaj' ? 'Przed tą datą pracownik nie jest sprawdzany - np. zatrudniony w połowie miesiąca nie ma nieobecności za pierwszą połowę.' : 'Zmień tylko to, co ma być inne - administrator zobaczy obecne i proponowane dane.'}</p>`;
+  let el = null;
+  const w = await modal({
+    tytul: `${ik('ludzie')} ${tytul}`, szeroki: true,
+    tresc: `${tresc}${pole('pr-uwagi', 'Uwagi dla administratora (opcjonalnie)', '<textarea class="pole" id="pr-uwagi" rows="2"></textarea>')}`,
+    przyciski: [{ tekst: 'Anuluj', wartosc: null }, { tekst: 'Dalej', klasa: 'btn-hr', wartosc: 'dalej', domyslny: true }],
+    poOtwarciu: (x) => { el = x; },
+  });
+  if (w !== 'dalej') return;
+  const v = (id) => ($(`#${id}`, el)?.value || '').trim();
+  const prop = { typ, nr: typ === 'dodaj' ? v('pr-nr') : p.nr, nazwisko: v('pr-nazwisko'), dzial: v('pr-dzial'), od: v('pr-od'), do: v('pr-do'), komentarz: v('pr-uwagi') };
+  if (typ === 'dodaj' && !prop.nazwisko) { toast('Podaj nazwisko i imię.', 'blad'); return oknoPropozycji(typ, p); }
+  if (typ === 'odejscie' && !prop.do) { toast('Podaj datę, od której pracownik nie pracuje.', 'blad'); return oknoPropozycji(typ, p); }
+  if (typ === 'zmien') {  // tylko zmienione pola
+    if (prop.nazwisko === p.nazwisko) prop.nazwisko = '';
+    if (prop.dzial === (p.dzial || '')) prop.dzial = '';
+    if (prop.od === (p.od || '')) prop.od = '';
+    if (!prop.nazwisko && !prop.dzial && !prop.od) return toast('Nic nie zmieniono.');
+  }
+  const opis = [
+    typ === 'dodaj' ? `Nowy pracownik: <b>${esc(prop.nazwisko)}</b>${prop.nr ? ` (nr ${esc(prop.nr)})` : ''}` : `<b>${esc(p.nazwisko)}</b> (nr ${esc(p.nr)})`,
+    prop.nazwisko && typ === 'zmien' && `nazwisko i imię: ${esc(p.nazwisko)} → <b>${esc(prop.nazwisko)}</b>`,
+    prop.dzial && (typ === 'zmien' ? `dział: ${esc(p.dzial || '—')} → <b>${esc(prop.dzial)}</b>` : `dział: <b>${esc(prop.dzial)}</b>`),
+    prop.od && `sprawdzany od: <b>${dataPl(prop.od)}</b>`, prop.do && `nie pracuje od: <b>${dataPl(prop.do)}</b>`, prop.komentarz && `uwagi: ${esc(prop.komentarz)}`,
+  ].filter(Boolean);
+  const ok = await modal({
+    tytul: `${ik('wyslij')} Wysłać propozycję?`,
+    tresc: `<ul class="lista-propozycji">${opis.map((x) => `<li>${x}</li>`).join('')}</ul><p class="podp">Administrator dostanie powiadomienie i zapisze zmianę w panelu. Do tego czasu baza pracowników się nie zmienia.</p>`,
+    przyciski: [{ tekst: 'Wróć', wartosc: null }, { tekst: `${ik('wyslij')} Wyślij propozycję`, klasa: 'btn-hr', wartosc: 'tak', domyslny: true }],
+  });
+  if (ok !== 'tak') return;
+  const r = await api('zaproponuj_pracownika', prop);
+  if (r?.ok) toast('Propozycja wysłana do administratora. Zmiana pojawi się po zatwierdzeniu w panelu (Ustawienia → Odśwież dane).', 'ok', null, 8000);
+  else if (r?.zaloguj) ekranLogowania('Sesja wygasła - zaloguj się ponownie.');
+  else toast(esc(r?.blad || 'Nie udało się wysłać propozycji.'), 'blad');
+}
+
 function rysujZgloszenie() {
   const el = $('#widok-zglos');
   el.innerHTML = `<section class="karta" style="max-width:820px; display:grid; gap:14px">

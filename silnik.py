@@ -57,6 +57,8 @@ class Silnik:
         self.u = {**DOMYSLNE, **(ustawienia or {})}
         self.baza_pracownikow = dane_serwera.get("pracownicy", {})
         self.baza_dzialow = dane_serwera.get("dzialy", {})
+        # Okres sprawdzania z panelu: {nr: {od, do}} (RRRR.MM.DD) - nowy pracownik sprawdzany od "od", odchodzący do dnia przed "do"
+        self.okresy = dane_serwera.get("okresy") or {}
         self.baza_urlopow = baza_urlopow or {}
         self.dane_do_zapisu = {}
         self.kontekst_pracownikow = {}
@@ -412,10 +414,15 @@ class Silnik:
         for pracownik in sorted(wszyscy_pracownicy):
             nazwisko = self.baza_pracownikow.get(pracownik, "---")
             dzial = self.pobierz_dzial_pracownika(pracownik)
-            jest_ignorowany = pracownik in lista_ignorowanych
-            
+            na_liscie_ignorowanych = pracownik in lista_ignorowanych
+            okres = self.okresy.get(pracownik) or {}
+
             for data in sorted(list(dni_robocze)):
                 klucz = (data, pracownik)
+                # Poza okresem z panelu - jak ignorowany. Pracownik z datą "nie pracuje od" jest na liście ignorowanych
+                # (starsze wersje programu), ale przed tą datą jest sprawdzany normalnie.
+                w_okresie = (not okres.get("od") or data >= okres["od"]) and (not okres.get("do") or data < okres["do"])
+                jest_ignorowany = not w_okresie or (na_liscie_ignorowanych and not okres.get("do"))
                 
                 jest_na_urlopie = False
                 if hasattr(self, 'baza_urlopow') and pracownik in self.baza_urlopow:

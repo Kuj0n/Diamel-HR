@@ -4,10 +4,17 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.6"
-BUILD_DATE = "2026-11-05 15:30"
+VERSION = "4.0.7"
+BUILD_DATE = "2026-11-05 16:00"
 
 CHANGELOG = """
+v4.0.7 (2026-11-05)
+- Raport PDF poziomo (A4): większa czcionka, dużo szersze pole Poprawka i pola przy nieobecnościach.
+- Zakładka Pracownicy: propozycja nowego pracownika, zmiany danych albo odejścia (od daty) - wysyłana do administratora,
+  który zapisuje ją w panelu.
+- Okres sprawdzania z panelu: nowy pracownik sprawdzany od daty zatrudnienia (bez nieobecności wcześniej), odchodzący
+  do dnia przed datą odejścia.
+
 v4.0.6 (2026-11-05)
 - Zaznaczanie pozycji na liście (pole wyboru w wierszu, w nagłówku - wszystkie widoczne): raport PDF / TXT tylko
   z zaznaczonych. Zastępuje filtr „Pracownicy” z wersji 4.0.5.
