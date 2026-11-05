@@ -416,7 +416,7 @@ function odswiezZaznaczenie() {
   const pasek = $('#pasek-zaznaczenia');
   if (pasek) {
     pasek.classList.toggle('ukryty', !n);
-    pasek.innerHTML = n ? `${ik('ok')}<span>Zaznaczono <b>${n}</b> ${odmiana(n, 'pozycję', 'pozycje', 'pozycji')} (${osoby} ${odmiana(osoby, 'pracownik', 'pracowników', 'pracowników')}) - raport obejmie tylko je</span>
+    pasek.innerHTML = n ? `${ik('ok')}<span>Zaznaczono <b>${n}</b> ${odmiana(n, 'pozycję', 'pozycje', 'pozycji')} (${osoby} ${odmiana(osoby, 'pracownik', 'pracowników', 'pracowników')}) - raport obejmie tylko zaznaczenia</span>
       <button class="btn btn-maly btn-bez" id="odznacz-wszystko">Odznacz wszystko</button>` : '';
     $('#odznacz-wszystko')?.addEventListener('click', () => { zaznaczone.clear(); rysujListe(); });
   }
