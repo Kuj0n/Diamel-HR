@@ -154,7 +154,9 @@ class Api:
     def uruchom_instalator(self):
         cel = os.path.join(tempfile.gettempdir(), "Aktualizacja_HR_Instalator.exe")
         subprocess.run(["powershell", "-NoProfile", "-Command", f"Unblock-File -Path '{cel}'"], shell=True)
-        subprocess.Popen([cel, "/FORCECLOSEAPPLICATIONS", "/NOCANCEL"])
+        # Instalacja bez klikania: tylko okienko z paskiem postępu Inno Setup, po instalacji program uruchamia się sam
+        # (wpis [Run] z Check: WizardSilent - w instalatorach od wersji 4.0.8)
+        subprocess.Popen([cel, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS", "/NOCANCEL"])
         os._exit(0)
 
     def zaloguj(self, login, haslo, zapamietaj):

@@ -151,7 +151,11 @@ async function oknoAktualizacji() {
   modal({ tytul: 'Pobieranie aktualizacji…', tresc: '<div class="postep" style="height:8px"><i id="akt-postep" style="width:0%"></i></div><p class="podp" id="akt-tekst" style="margin-top:10px">0%</p>' });
   window.postepAktualizacji = (p) => { const el = $('#akt-postep'); if (el) { el.style.width = `${p}%`; $('#akt-tekst').textContent = `${p}%`; } };
   window.aktualizacjaPobrana = (ok, blad) => {
-    if (ok) return api('uruchom_instalator');
+    if (ok) {
+      const t = $('#akt-tekst');
+      if (t) t.textContent = 'Instalowanie… Program zamknie się na chwilę i uruchomi ponownie sam.';
+      return setTimeout(() => api('uruchom_instalator'), 900);
+    }
     modalOtwarty?.zamknij();
     toast(`Nie udało się pobrać aktualizacji: ${esc(blad)}`, 'blad');
   };
@@ -614,13 +618,15 @@ function rysujSzuflade() {
       </div>
       <div class="stopka-szuflady">
         <button class="btn" style="flex:1" id="sz-pomin" title="Następny bez oznaczania">Pomiń</button>
+        <button class="btn" style="flex:1.3" id="sz-zapisz-zamknij" title="Zapisz i zamknij panel (Ctrl+Enter)">${ik('ok')} ${zmienione() ? 'Zapisz zmiany' : 'Zatwierdź'}</button>
         <button class="btn btn-hr" style="flex:2" id="sz-zatwierdz" title="Enter">${zmienione() ? 'Zapisz zmiany i następny' : 'Zatwierdź i następny'} ${ik('dalej')}</button>
       </div>
     </aside>`;
   $('#sz-tlo').onclick = zamknijSzufladePytaj;
   $('#sz-zamknij').onclick = zamknijSzufladePytaj;
   $('#sz-pomin').onclick = async () => { if (await moznaOpuscicDzien()) nastepny(false); };
-  $('#sz-zatwierdz').onclick = zatwierdzDzien;
+  $('#sz-zatwierdz').onclick = () => zatwierdzDzien(true);
+  $('#sz-zapisz-zamknij').onclick = () => zatwierdzDzien(false);
   $('#sz-dodaj').onclick = () => {
     const nowe = noweZdarzenie(z, d);
     z.push(nowe);
@@ -667,7 +673,8 @@ function rysujSzuflade() {
   });
 }
 
-async function zatwierdzDzien() {
+// dalej: true - następna pozycja z listy, false - zapis i zamknięcie panelu
+async function zatwierdzDzien(dalej = true) {
   if (!szuflada) return;
   const wiersze = $$('.zdarz[data-i]');
   if (!wiersze.every((w) => w.czytaj())) return toast('Popraw godzinę w formacie GG:MM (00:00 - 23:59).', 'blad');
@@ -675,7 +682,8 @@ async function zatwierdzDzien() {
   const s = zmienione() ? await api('zapisz_dzien', d.id, z, 'sprawdzone') : await api('oznacz', d.id, 'sprawdzone');
   if (!s) return;
   nowyStan(s);
-  nastepny(true);
+  if (dalej) nastepny(true);
+  else { zamknijSzuflade(); toast('Zapisano.', 'ok', null, 2000); }
 }
 
 function nastepny(poZatwierdzeniu) {
@@ -1170,7 +1178,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON' && document.activeElement?.tagName !== 'TEXTAREA') {
       e.preventDefault();
       document.activeElement?.blur?.();
-      return zatwierdzDzien();
+      return zatwierdzDzien(!e.ctrlKey)  // Ctrl+Enter - zapisz i zamknij;
     }
     return;
   }

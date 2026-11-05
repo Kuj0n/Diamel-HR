@@ -180,6 +180,8 @@ Name: "{{autodesktop}}\\Korektor Logów HR"; Filename: "{{app}}\\{nazwa_stala}.e
 
 [Run]
 Filename: "{{app}}\\{nazwa_stala}.exe"; Description: "Uruchom Korektor Logów HR"; WorkingDir: "{{app}}"; Flags: nowait postinstall skipifsilent
+; aktualizacja z programu (instalacja w tle, /SILENT): program uruchamia się ponownie sam
+Filename: "{{app}}\\{nazwa_stala}.exe"; WorkingDir: "{{app}}"; Flags: nowait; Check: WizardSilent
 
 [Code]
 const HWND_TOPMOST = -1; SWP_SHOWWINDOW = $0040; FLASHW_ALL = $00000006;
