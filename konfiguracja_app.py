@@ -16,6 +16,7 @@ v4.0.8 (2026-11-05)
 - Raport PDF: każdy dzień nieobecności w osobnym wierszu, pole do wpisania na całą szerokość.
 - Aktualizacja bez klikania instalatora: po „Pobierz i zainstaluj” program pobiera, instaluje w tle (pasek postępu)
   i uruchamia się ponownie sam (działa przy aktualizacjach z tej wersji na nowsze).
+- Odśwież dane: okno pokazuje stan bazy pracowników i reguł na serwerze (liczba osób, data zmiany) obok stanu w programie.
 
 v4.0.7 (2026-11-05)
 - Raport PDF poziomo (A4): większa czcionka, dużo szersze pole Poprawka i pola przy nieobecnościach.

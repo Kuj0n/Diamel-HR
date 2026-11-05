@@ -997,12 +997,18 @@ function rysujUstawienia() {
   $('#u-folder').onclick = async () => { INFO.program = await api('wybierz_folder_zapisu'); rysujUstawienia(); };
   $('#u-folder-dom')?.addEventListener('click', async () => { await zmienProgram('folder_zapisu', ''); rysujUstawienia(); });
   $('#u-odswiez')?.addEventListener('click', async () => {
+    const b = $('#u-odswiez');
+    b.disabled = true;
+    const sv = await api('stan_serwera');  // co jest na serwerze - zanim cokolwiek pobierzemy
+    b.disabled = false;
+    if (sv?.zaloguj) return ekranLogowania('Sesja wygasła - zaloguj się ponownie.');
+    const naSerwerze = (tekst) => (sv?.ok ? `<b>na serwerze: ${tekst}</b>` : '<span style="color:var(--czerwony-tekst)">stan na serwerze niedostępny</span>');
     const w = await modal({
       tytul: `${ik('odswiez')} Odśwież dane z serwera`,
       tresc: `<p>Co pobrać z panelu na diamel.pl?</p>
         <div class="lista-wyboru">
-          <label><input type="checkbox" id="o-prac" checked><span style="flex:1"><b style="font-weight:600">Baza pracowników</b><br><span class="podp">nazwiska, działy, przypisania zmian, niepracujący · teraz: ${liczba(KONTO.pracownikow)} osób${KONTO.wersja_bazy ? `, stan z ${esc(KONTO.wersja_bazy)}` : ''}</span></span></label>
-          <label><input type="checkbox" id="o-reg" checked><span style="flex:1"><b style="font-weight:600">Reguły firmowe</b><br><span class="podp">zaokrąglanie, duplikaty, nadgodziny, ignorowani · teraz: ${REG.sa_firmowe ? esc(REG.wersja || 'tak') : 'brak - reguły domyślne'}</span></span></label>
+          <label><input type="checkbox" id="o-prac" checked><span style="flex:1"><b style="font-weight:600">Baza pracowników</b><br><span class="podp">nazwiska, działy, przypisania zmian, niepracujący<br>${naSerwerze(`${liczba(sv?.pracownikow)} osób (pracuje ${liczba(sv?.pracuje)}), stan z ${esc(sv?.wersja || '-')}`)}<br>w programie: ${liczba(KONTO.pracownikow)} osób${KONTO.wersja_bazy ? `, stan z ${esc(KONTO.wersja_bazy)}` : ''}${sv?.ok && sv.wersja === KONTO.wersja_bazy ? ' - <b>aktualna</b>' : ''}</span></span></label>
+          <label><input type="checkbox" id="o-reg" checked><span style="flex:1"><b style="font-weight:600">Reguły firmowe</b><br><span class="podp">zaokrąglanie, duplikaty, nadgodziny, ignorowani<br>${naSerwerze(sv?.reguly_wersja || 'brak reguł firmowych')}<br>w programie: ${REG.sa_firmowe ? esc(REG.wersja || 'tak') : 'brak - reguły domyślne'}${sv?.ok && sv.reguly_wersja && sv.reguly_wersja === REG.wersja ? ' - <b>aktualne</b>' : ''}</span></span></label>
         </div>${Object.keys(REG.lokalne).length ? `<p class="podp" style="margin-top:10px">Twoje zmiany lokalne reguł (${Object.keys(REG.lokalne).length}) zostają - nadal mają pierwszeństwo przed firmowymi.</p>` : ''}`,
       przyciski: [{ tekst: 'Anuluj', wartosc: null }, { tekst: `${ik('pobierz')} Pobierz`, klasa: 'btn-hr', wartosc: 'tak', domyslny: true }],
       poOtwarciu: (el) => { window._odswiez = el; },

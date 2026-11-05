@@ -318,6 +318,15 @@ class Api:
             return {"ok": False, "blad": f"Brak połączenia z serwerem: {e}"}
         return {"ok": bool(odp.get("ok")), "blad": odp.get("blad", "")}
 
+    def stan_serwera(self):
+        """Stan bazy pracowników i reguł w panelu (przed pobraniem): liczba pracowników, data zmiany, wersja reguł."""
+        token = getattr(self, "_token", None) or serwer_hr.wczytaj_token()
+        try:
+            odp = serwer_hr.zapytanie({"akcja": "stan_danych", "token": token}, timeout=6.0)
+        except Exception as e:
+            return {"ok": False, "blad": f"Brak połączenia z serwerem: {e}"}
+        return odp if odp.get("ok") else {"ok": False, "blad": odp.get("blad", "Serwer nie odpowiada."), "zaloguj": bool(odp.get("zaloguj"))}
+
     def baza_pracownikow(self):
         """Pracownicy z panelu (do zakładki Pracownicy): numer, nazwisko, dział, ignorowany, okres sprawdzania (od / do)."""
         d = self.dane_serwera
