@@ -4,10 +4,13 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.8"
-BUILD_DATE = "2026-11-05 17:30"
+VERSION = "4.0.9"
+BUILD_DATE = "2026-11-05 19:00"
 
 CHANGELOG = """
+v4.0.9 (2026-11-05)
+- Pierwsza aktualizacja bez klikania instalatora: program pobiera nową wersję, instaluje ją w tle i uruchamia się ponownie sam.
+
 v4.0.8 (2026-11-05)
 - Lista do sprawdzenia: bez pustej kratki stanu (zostaje tylko ✓ sprawdzone / – pominięte), pole wyboru jest jedno.
 - Propozycja nowego pracownika: wszystkie dane obowiązkowe (nazwisko i imię, numer RCP - 4 cyfry, dział, data),
