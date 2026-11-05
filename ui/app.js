@@ -42,7 +42,7 @@ const ik = (n, kl = '') => `<svg class="ik ${kl}" viewBox="0 0 24 24">${IK[n]}</
 // ------------------------------------------------------------------ stan okna
 let INFO = {}, STAN = null, REG = null, KONTO = null, AKT = null, PRACOWNICY = [], WPISY = [];
 let widok = 'pulpit';
-const filtr = { tryb: 'problemy', rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie', 'nieobecnosc']), dzialy: new Set(), pracownicy: new Set(), szukaj: '', ukryjSprawdzone: false, sort: '' };
+const filtr = { tryb: 'problemy', rodzaje: new Set(['blad', 'niepelny', 'ostrzezenie', 'nieobecnosc']), dzialy: new Set(), szukaj: '', ukryjSprawdzone: false, sort: '' };
 let wybranyId = null;
 let szuflada = null;   // { d: dane dnia z Pythona, z: zdarzenia w edycji, kolejka: lista id }
 let przeliczTimer = null;
@@ -243,7 +243,8 @@ $$('#motyw button').forEach((b) => b.addEventListener('click', () => zmienProgra
 function nowyStan(s) {
   if (!s) return;
   STAN = s;
-  if (filtr.pracownicy.size && !(s.anomalie || []).some((a) => filtr.pracownicy.has(a.pracownik))) filtr.pracownicy.clear();
+  const ids = new Set((s.anomalie || []).map((a) => a.id));
+  [...zaznaczone].forEach((id) => ids.has(id) || zaznaczone.delete(id));  // nowy plik / przeliczenie: zostają tylko istniejące pozycje
   if (s.ok === false && s.blad) toast(esc(s.blad), 'blad');
   WPISY = [];
   odswiezDol();
@@ -279,7 +280,6 @@ function tagi(uwaga) {
 function widoczneAnomalie() {
   const q = filtr.szukaj.trim().toLowerCase();
   let l = (STAN?.anomalie || []).filter((a) => filtr.rodzaje.has(a.rodzaj) && (!filtr.dzialy.size || filtr.dzialy.has(a.dzial))
-    && (!filtr.pracownicy.size || filtr.pracownicy.has(a.pracownik))
     && (!filtr.ukryjSprawdzone || !a.status) && (!q || a.pracownik.includes(q) || a.nazwisko.toLowerCase().includes(q) || a.uwaga.toLowerCase().includes(q) || dataKr(a.data).includes(q)));
   if (filtr.sort) {
     const [pole, kier] = filtr.sort.split(':');
@@ -342,7 +342,6 @@ function rysujPulpit() {
           <button data-tryb="wszystkie" class="${filtr.tryb === 'wszystkie' ? 'akt' : ''}" title="Wszystkie dni pracy w pliku dla ERP - także bez problemów">Wszystkie wpisy</button>
         </div>
         <div class="rozwijane wyrozniony" id="f-dzialy"><button class="pole" id="f-dzialy-przycisk">${ik('ludzie')}<span>${opisDzialow(s.dzialy)}</span></button></div>
-        <div class="rozwijane ${filtr.pracownicy.size ? 'wyrozniony' : ''}" id="f-prac"><button class="pole" id="f-prac-przycisk" title="Lista i raport tylko dla zaznaczonych pracowników">${ik('ludzie')}<span>${opisPracownikow()}</span></button></div>
         <div class="filtry ${filtr.tryb === 'wszystkie' ? 'ukryty' : ''}">${Object.entries(RODZAJE).map(([r, n]) => `<button class="znacznik ${filtr.rodzaje.has(r) ? 'akt' : ''} ${licz(r) ? '' : 'zero'}" data-rodzaj="${r}"><span class="kropka ${r}"></span>${n} <b>${licz(r)}</b></button>`).join('')}</div>
         <div class="szukaj">
           <input class="pole" id="f-szukaj" placeholder="Szukaj…  (Ctrl+F)" value="${esc(filtr.szukaj)}" style="width:230px">
@@ -355,6 +354,7 @@ function rysujPulpit() {
       <button class="btn rozciagnij" id="p-przetworz" title="F5">${ik('odswiez')} Przetwórz ponownie z bieżącymi regułami${s.reczne ? ` <span class="podp">(${s.reczne} ${odmiana(s.reczne, 'ręczna korekta zostaje', 'ręczne korekty zostają', 'ręcznych korekt zostaje')})</span>` : ''}</button>
       <button class="btn" id="p-dodaj">${ik('plus')} Dodaj zdarzenie ręcznie</button>
     </div>
+    <div class="pasek-zaznaczenia ukryty" id="pasek-zaznaczenia"></div>
     <div class="koniec">
       <button class="btn btn-hr duzy" id="p-zapisz" title="Ctrl+S">${ik('pobierz')} Zapisz plik do importu w Comarch ERP XL</button>
       ${INFO.program.eksport_pdf ? `<button class="btn btn-raport" id="p-pdf">${ik('plik')} Raport PDF</button>` : ''}
@@ -372,8 +372,7 @@ function rysujPulpit() {
   $('#p-pdf')?.addEventListener('click', () => eksport('pdf'));
   $('#p-txt')?.addEventListener('click', () => eksport('txt'));
   $$('[data-rodzaj]').forEach((b) => b.onclick = () => { filtr.rodzaje.has(b.dataset.rodzaj) ? filtr.rodzaje.delete(b.dataset.rodzaj) : filtr.rodzaje.add(b.dataset.rodzaj); b.classList.toggle('akt'); rysujListe(); });
-  $('#f-dzialy-przycisk').onclick = (e) => { e.stopPropagation(); $('#f-prac .panel-listy')?.remove(); przelaczListeDzialow(s); };
-  $('#f-prac-przycisk').onclick = (e) => { e.stopPropagation(); $('#f-dzialy .panel-listy')?.remove(); przelaczListePracownikow(s); };
+  $('#f-dzialy-przycisk').onclick = (e) => { e.stopPropagation(); przelaczListeDzialow(s); };
   $('#f-szukaj').oninput = (e) => { filtr.szukaj = e.target.value; rysujListe(); };
   $('#f-sprawdzone').onclick = (e) => { filtr.ukryjSprawdzone = !filtr.ukryjSprawdzone; e.currentTarget.classList.toggle('akt'); rysujListe(); };
 }
@@ -403,56 +402,33 @@ function przelaczListeDzialow(s) {
   $$('[data-dz]', panel).forEach((b) => b.onclick = () => { $$('input', panel).forEach((c) => c.checked = b.dataset.dz === 'wszystkie'); zastosuj(); });
   box.append(panel);
 }
-document.addEventListener('click', () => { $('#f-dzialy .panel-listy')?.remove(); $('#f-prac .panel-listy')?.remove(); });
+document.addEventListener('click', () => $('#f-dzialy .panel-listy')?.remove());
 
-// Pracownicy z problemami w pliku (do filtra): nr -> {nazwisko, dział, liczba pozycji}
-function pracownicyZProblemami(s) {
-  const m = new Map();
-  for (const a of s.anomalie) {
-    const p = m.get(a.pracownik) || { nr: a.pracownik, nazwisko: a.nazwisko, dzial: a.dzial, ile: 0 };
-    if (filtr.rodzaje.has(a.rodzaj)) p.ile += 1;
-    m.set(a.pracownik, p);
+// Zaznaczanie pozycji na liście (pole wyboru w wierszu, w nagłówku - wszystkie widoczne): raport PDF / TXT tylko z zaznaczonych
+const zaznaczone = new Set();
+function odswiezZaznaczenie() {
+  const n = zaznaczone.size;
+  const osoby = new Set((STAN?.anomalie || []).filter((a) => zaznaczone.has(a.id)).map((a) => a.pracownik)).size;
+  const pasek = $('#pasek-zaznaczenia');
+  if (pasek) {
+    pasek.classList.toggle('ukryty', !n);
+    pasek.innerHTML = n ? `${ik('ok')}<span>Zaznaczono <b>${n}</b> ${odmiana(n, 'pozycję', 'pozycje', 'pozycji')} (${osoby} ${odmiana(osoby, 'pracownik', 'pracowników', 'pracowników')}) - raport obejmie tylko je</span>
+      <button class="btn btn-maly btn-bez" id="odznacz-wszystko">Odznacz wszystko</button>` : '';
+    $('#odznacz-wszystko')?.addEventListener('click', () => { zaznaczone.clear(); rysujListe(); });
   }
-  return [...m.values()].sort((a, b) => a.nazwisko.localeCompare(b.nazwisko, 'pl') || a.nr.localeCompare(b.nr));
+  for (const id of ['p-pdf', 'p-txt']) {
+    const b = $(`#${id}`);
+    if (b) b.innerHTML = `${ik('plik')} Raport ${id === 'p-pdf' ? 'PDF' : 'TXT'}${n ? ` <span class="licznik-zazn">${n}</span>` : ''}`;
+  }
+  const wszystkie = $('#zazn-wszystkie');
+  if (wszystkie) {
+    const widoczne = widoczneAnomalie().map((a) => a.id);
+    const ile = widoczne.filter((id) => zaznaczone.has(id)).length;
+    wszystkie.checked = !!widoczne.length && ile === widoczne.length;
+    wszystkie.indeterminate = ile > 0 && ile < widoczne.length;
+  }
 }
-function opisPracownikow() {
-  const n = filtr.pracownicy.size;
-  if (!n) return 'Wszyscy pracownicy';
-  if (n === 1) { const nr = [...filtr.pracownicy][0]; return esc(STAN?.anomalie.find((a) => a.pracownik === nr)?.nazwisko || nr); }
-  return `Pracownicy: ${n} wybranych`;
-}
-/** Zaznaczanie pracowników: lista na pulpicie i raport PDF / TXT tylko dla nich (nikt nie zaznaczony = wszyscy). */
-function przelaczListePracownikow(s) {
-  const box = $('#f-prac');
-  const otwarta = $('.panel-listy', box);
-  if (otwarta) return otwarta.remove();
-  const lista = pracownicyZProblemami(s);
-  const panel = document.createElement('div');
-  panel.className = 'panel-listy lewa panel-pracownikow';
-  panel.innerHTML = `<div class="gora-listy"><input class="pole" id="f-prac-szukaj" placeholder="Szukaj: nazwisko, numer, dział…" spellcheck="false">
-      <button class="btn btn-maly" data-pr="wszyscy" title="Zaznacz widocznych">Zaznacz</button><button class="btn btn-maly btn-bez" data-pr="zaden">Wszyscy pracownicy</button></div>
-    <div class="przewijana-prac">${lista.map((p) => `<label data-szukaj="${esc(`${p.nazwisko} ${p.nr} ${p.dzial}`.toLowerCase())}"><input type="checkbox" value="${esc(p.nr)}" ${filtr.pracownicy.has(p.nr) ? 'checked' : ''}>
-      <span>${esc(p.nazwisko)} <small>${esc(p.nr)} · ${esc(p.dzial || '—')}</small></span><small>${p.ile}</small></label>`).join('')}</div>
-    <div class="podp" style="padding:6px 10px 2px">Nikt nie zaznaczony = wszyscy. Raport PDF / TXT obejmie tylko zaznaczonych.</div>`;
-  panel.addEventListener('click', (e) => e.stopPropagation());
-  const zastosuj = () => {
-    filtr.pracownicy = new Set($$('input[type=checkbox]', panel).filter((c) => c.checked).map((c) => c.value));
-    $('#f-prac-przycisk span').innerHTML = opisPracownikow();
-    box.classList.toggle('wyrozniony', filtr.pracownicy.size > 0);
-    rysujListe();
-  };
-  $$('input[type=checkbox]', panel).forEach((c) => c.onchange = zastosuj);
-  $('#f-prac-szukaj', panel).oninput = (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    $$('label[data-szukaj]', panel).forEach((l) => l.classList.toggle('ukryty', !!q && !l.dataset.szukaj.includes(q)));
-  };
-  $$('[data-pr]', panel).forEach((b) => b.onclick = () => {
-    $$('label[data-szukaj]', panel).forEach((l) => { const c = $('input', l); if (b.dataset.pr === 'zaden') c.checked = false; else if (!l.classList.contains('ukryty')) c.checked = true; });
-    zastosuj();
-  });
-  box.append(panel);
-  $('#f-prac-szukaj', panel).focus();
-}
+
 
 function rysujListe() {
   const box = $('#lista-przewijana');
@@ -465,14 +441,35 @@ function rysujListe() {
     box.innerHTML = `<div class="pusto">${STAN.anomalie.length ? 'Brak pozycji dla wybranych filtrów.' : 'Nie znaleziono problemów - plik jest gotowy do zapisu.'}</div>`;
     return;
   }
-  box.innerHTML = `<table class="tab"><thead><tr>${kol.map(([p, n]) => `<th data-sort="${p}">${n}${strz(p)}</th>`).join('')}<th></th></tr></thead><tbody>
-    ${l.map((a) => `<tr data-id="${esc(a.id)}" class="${a.status ? 'sprawdzony' : ''} ${a.id === wybranyId ? 'wybrany' : ''}">
+  box.innerHTML = `<table class="tab"><thead><tr><th class="w-zazn"><input type="checkbox" id="zazn-wszystkie" title="Zaznacz / odznacz wszystkie widoczne pozycje"></th>${kol.map(([p, n]) => `<th data-sort="${p}">${n}${strz(p)}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${l.map((a) => `<tr data-id="${esc(a.id)}" class="${a.status ? 'sprawdzony' : ''} ${a.id === wybranyId ? 'wybrany' : ''} ${zaznaczone.has(a.id) ? 'zaznaczony' : ''}">
+      <td class="w-zazn"><input type="checkbox" class="zazn" ${zaznaczone.has(a.id) ? 'checked' : ''} title="Zaznacz do raportu"></td>
       <td>${a.status === 'sprawdzone' ? `<span class="stan-ikona ok" title="Sprawdzone">${ik('ok')}</span>` : a.status ? `<span class="stan-ikona pom" title="Pominięte">–</span>` : '<span class="stan-ikona"></span>'}</td>
       <td class="data">${dataKr(a.data)}<small>${dzienTyg(a.data)}</small></td><td class="nr">${esc(a.pracownik)}</td>
       <td class="nazwisko">${esc(a.nazwisko)}</td><td class="dzial" title="${esc(a.dzial)}">${esc(a.dzial)}</td><td class="zmiana">${esc(zmianaKr(a.typ_zmiany))}</td>
       <td>${tagi(a.uwaga)}${a.reczna ? '<span class="tag reczna">poprawione ręcznie</span>' : ''}</td>
       <td style="text-align:right"><button class="btn btn-maly">Popraw</button></td></tr>`).join('')}</tbody></table>`;
-  $$('tbody tr', box).forEach((tr) => tr.onclick = () => otworzDzien(tr.dataset.id));
+  $$('tbody tr', box).forEach((tr) => tr.onclick = (e) => {
+    if (e.target.closest('.w-zazn')) return;
+    otworzDzien(tr.dataset.id);
+  });
+  $$('.w-zazn', box).forEach((td) => td.onclick = (e) => {  // cała komórka klikalna - łatwiej trafić
+    e.stopPropagation();
+    if (e.target.tagName !== 'INPUT') { const c = $('input', td); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
+  });
+  $$('input.zazn', box).forEach((c) => c.onchange = () => {
+    const tr = c.closest('tr');
+    c.checked ? zaznaczone.add(tr.dataset.id) : zaznaczone.delete(tr.dataset.id);
+    tr.classList.toggle('zaznaczony', c.checked);
+    odswiezZaznaczenie();
+  });
+  $('#zazn-wszystkie').onchange = (e) => {
+    const widoczne = l.map((a) => a.id);
+    widoczne.forEach((id) => (e.target.checked ? zaznaczone.add(id) : zaznaczone.delete(id)));
+    $$('tbody tr', box).forEach((tr) => { const z = zaznaczone.has(tr.dataset.id); tr.classList.toggle('zaznaczony', z); $('input.zazn', tr).checked = z; });
+    odswiezZaznaczenie();
+  };
+  odswiezZaznaczenie();
   $$('th[data-sort]', box).forEach((th) => th.onclick = () => {
     const p = th.dataset.sort;
     filtr.sort = filtr.sort === `${p}:r` ? `${p}:d` : filtr.sort === `${p}:d` ? '' : `${p}:r`;
@@ -721,7 +718,7 @@ async function dodajZdarzenieRecznie(nr = '', data = '') {
 // ------------------------------------------------------------------ zapis i raporty
 async function zapiszErp(tryb = null) {
   if (!STAN?.rcp) return toast('Najpierw wczytaj plik RCP.');
-  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy], [...filtr.pracownicy]);
+  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy], []);
   const r = await api('zapisz_erp', tryb);
   if (!r) return;
   if (r.pytanie) {
@@ -745,9 +742,9 @@ async function zapiszErp(tryb = null) {
 }
 
 async function eksport(format) {
-  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy], [...filtr.pracownicy]);
+  await api('ustaw_filtr_raportu', [...filtr.rodzaje], [...filtr.dzialy], [...zaznaczone]);
   const r = await api('eksport_raportu', format);
-  if (r?.ok) toast(`Zapisano raport <b>${esc(r.plik.split(/[\\/]/).pop())}</b>${filtr.pracownicy.size ? `<br><span class="podp">tylko wybrani pracownicy: ${filtr.pracownicy.size}</span>` : ''}<br><span class="podp">${esc(r.plik.replace(/[\\/][^\\/]*$/, ''))}</span>`, 'ok', { tekst: 'Pokaż w folderze', fn: () => api('otworz_folder', r.plik) }, 8000);
+  if (r?.ok) toast(`Zapisano raport <b>${esc(r.plik.split(/[\\/]/).pop())}</b>${zaznaczone.size ? `<br><span class="podp">tylko zaznaczone pozycje: ${zaznaczone.size}</span>` : ''}<br><span class="podp">${esc(r.plik.replace(/[\\/][^\\/]*$/, ''))}</span>`, 'ok', { tekst: 'Pokaż w folderze', fn: () => api('otworz_folder', r.plik) }, 8000);
   else if (r && !r.anulowano) toast(esc(r.blad), 'blad');
 }
 
@@ -918,7 +915,7 @@ async function rysujWszystkieWpisy(box) {
   }
   const q = filtr.szukaj.trim().toLowerCase();
   const anom = new Map(STAN.anomalie.map((a) => [a.id, a]));
-  const l = WPISY.filter((w) => (!filtr.dzialy.size || filtr.dzialy.has(w.dzial)) && (!filtr.pracownicy.size || filtr.pracownicy.has(w.nr))
+  const l = WPISY.filter((w) => (!filtr.dzialy.size || filtr.dzialy.has(w.dzial))
     && (!q || w.nr.includes(q) || w.nazwisko.toLowerCase().includes(q) || dataKr(w.data).includes(q) || w.zdarzenia.includes(q)));
   const pokaz = l.slice(0, 1500);
   box.innerHTML = l.length ? `<table class="tab"><thead><tr><th>Dzień</th><th>Nr</th><th>Pracownik</th><th>Dział</th><th>Zmiana</th><th>Odbicia (po korekcie)</th><th>Uwagi</th></tr></thead><tbody>

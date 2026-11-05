@@ -373,12 +373,12 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 @keyframes unies { from { transform: translateY(8px); opacity: 0; } }
 @keyframes obrot { to { transform: rotate(360deg); } }
 
-/* Filtr pracowników: lista z wyszukiwaniem */
-.rozwijane .panel-pracownikow { width: 400px; max-height: none; overflow: visible; }
-.panel-pracownikow .gora-listy { display: flex; gap: 6px; align-items: center; }
-.panel-pracownikow .gora-listy .pole { flex: 1; min-width: 0; padding: 6px 9px; font-size: 0.84rem; }
-.panel-pracownikow .przewijana-prac { max-height: 340px; overflow: auto; }
-.panel-pracownikow label { display: flex; align-items: center; gap: 8px; }
-.panel-pracownikow label > span { flex: 1; min-width: 0; }
-.rozwijane .panel-pracownikow label > span small { color: var(--muted); margin-left: 4px; }
-.panel-pracownikow label.ukryty { display: none; }
+/* Zaznaczanie pozycji na liście (raport tylko z zaznaczonych) */
+.tab .w-zazn { width: 34px; text-align: center; cursor: pointer; }
+.tab .w-zazn input { width: 16px; height: 16px; accent-color: var(--kolor); cursor: pointer; margin: 0; vertical-align: middle; }
+.tab tr.zaznaczony td { background: color-mix(in srgb, var(--kolor) 9%, transparent); }
+.pasek-zaznaczenia { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 12px; font-size: 0.88rem;
+  background: color-mix(in srgb, var(--kolor) 12%, transparent); border: 1px solid color-mix(in srgb, var(--kolor) 40%, transparent); }
+.pasek-zaznaczenia svg { width: 16px; height: 16px; color: var(--kolor); }
+.pasek-zaznaczenia span { flex: 1; }
+.licznik-zazn { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--kolor); color: var(--na-kolorze); font-size: 0.78rem; font-weight: 700; }

@@ -237,39 +237,71 @@ def zapisz(sciezka, anomalie, statystyki, plik, uzytkownik, wersja, podpisy=Fals
             pdf.cell(0, 4.4, f"{_data(d)}.{d[:4]}   {nr}   {nazwiska.get(nr, '---')}", new_x="LMARGIN", new_y="NEXT")
 
     if nieobecnosci:
-        # Jeden wiersz na pracownika: numer, nazwisko, dział i dni bez odbić
+        # Pracownik (numer, nazwisko, dział), pod nim jego dni bez odbić - każdy dzień z polem na wpis (np. powód, kod
+        # nieobecności) i kratką do odhaczenia po wprowadzeniu w ERP; dni w trzech kolumnach
         osoby = OrderedDict()
         for a in sorted(nieobecnosci, key=lambda a: (a["dzial"], a["pracownik"], a["data"])):
-            osoby.setdefault((a["pracownik"], a["nazwisko"], a["dzial"]), []).append(_data(a["data"]))
-        if pdf.get_y() > 250:
+            osoby.setdefault((a["pracownik"], a["nazwisko"], a["dzial"]), []).append(a)
+        if pdf.get_y() > 245:
             pdf.add_page()
         pdf.ln(5)
         pdf.set_font("txt", "B", 10)
         pdf.cell(0, 6, f"Nieobecności bez wpisu w planie urlopów ({len(nieobecnosci)} dni)", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("txt", "", 7.5)
         pdf.set_text_color(60)
-        pdf.cell(0, 4, "Dni robocze bez żadnego odbicia. Wczytanie planu nieobecności (Excel) usuwa z listy dni urlopów.", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 4, "Dni robocze bez żadnego odbicia. Przy każdym dniu: pole na wpis (np. powód, kod nieobecności) i kratka"
+                       + (" do odhaczenia." if kratki else "."), new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0)
         pdf.ln(1)
+        kol, szer_kol, h_dnia = 3, 182 / 3, 6.2
         for (nr, nazwisko, dzial), dni in osoby.items():
-            if pdf.get_y() > 272:
+            wiersze = -(-len(dni) // kol)
+            if pdf.get_y() + 5.5 + min(wiersze, 2) * h_dnia > 279:
                 pdf.add_page()
             y = pdf.get_y()
+            pdf.set_fill_color(236)
+            pdf.rect(14, y, 182, 5.2, style="F")
+            pdf.set_xy(15, y + 0.5)
             pdf.set_font("mono", "", 7.8)
             pdf.cell(11, 4.2, nr)
             pdf.set_font("txt", "B", 8)
-            pdf.cell(46, 4.2, pdf_skroc(pdf, nazwisko, 45))
+            pdf.cell(60, 4.2, pdf_skroc(pdf, nazwisko, 59))
             pdf.set_font("txt", "", 7.5)
             pdf.set_text_color(60)
-            pdf.cell(38, 4.2, pdf_skroc(pdf, dzial, 37))
+            pdf.cell(80, 4.2, pdf_skroc(pdf, dzial, 79))
+            pdf.cell(29, 4.2, f"{len(dni)} {'dzień' if len(dni) == 1 else 'dni'}", align="R")
             pdf.set_text_color(0)
-            pdf.set_font("txt", "", 8)
-            pdf.multi_cell(87, 4.2, ", ".join(dni), align="L", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_y(y + 5.8)
+            for w in range(wiersze):
+                if pdf.get_y() + h_dnia > 279:
+                    pdf.add_page()
+                y = pdf.get_y()
+                for k, a in enumerate(dni[w * kol:(w + 1) * kol]):
+                    x = 14 + k * szer_kol
+                    pdf.set_font("mono", "", 7.6)
+                    pdf.set_xy(x + 1, y + 1)
+                    dt = datetime.strptime(a["data"], "%Y.%m.%d")
+                    pdf.cell(17, 4, f"{_data(a['data'])} {['pn', 'wt', 'śr', 'cz', 'pt', 'so', 'nd'][dt.weekday()]}")
+                    xp, wp = x + 18.5, szer_kol - (25 if kratki else 20)
+                    pdf.set_draw_color(170)
+                    pdf.set_line_width(0.2)
+                    pdf.rect(xp, y + 0.6, wp, h_dnia - 1.2)
+                    pdf.set_draw_color(0)
+                    pola_formularza.append({"typ": "tekst", "strona": pdf.page_no(), "x": xp, "y": y + 0.6, "w": wp, "h": h_dnia - 1.2,
+                                            "nazwa": f"nieob_{len(pola_formularza)}", "opis": f"Nieobecność: {nr} {_data(a['data'])}"})
+                    if kratki:
+                        xk = xp + wp + 1.8
+                        pdf.set_line_width(0.25)
+                        pdf.rect(xk, y + 1.7, 2.8, 2.8)
+                        pola_formularza.append({"typ": "kratka", "strona": pdf.page_no(), "x": xk, "y": y + 1.7, "w": 2.8, "h": 2.8,
+                                                "nazwa": f"nieob_ok_{len(pola_formularza)}", "zaznaczone": bool(a.get("status")),
+                                                "opis": f"OK nieobecność: {nr} {_data(a['data'])}"})
+                pdf.set_y(y + h_dnia)
             pdf.set_draw_color(205)
             pdf.set_line_width(0.15)
-            pdf.line(14, pdf.get_y() + 0.4, 196, pdf.get_y() + 0.4)
+            pdf.line(14, pdf.get_y() + 0.6, 196, pdf.get_y() + 0.6)
             pdf.set_draw_color(0)
-            pdf.ln(1)
+            pdf.ln(2)
 
     if podpisy:
         if pdf.get_y() > 250:

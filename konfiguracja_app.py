@@ -4,10 +4,15 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.5"
-BUILD_DATE = "2026-11-05 14:00"
+VERSION = "4.0.6"
+BUILD_DATE = "2026-11-05 15:30"
 
 CHANGELOG = """
+v4.0.6 (2026-11-05)
+- Zaznaczanie pozycji na liście (pole wyboru w wierszu, w nagłówku - wszystkie widoczne): raport PDF / TXT tylko
+  z zaznaczonych. Zastępuje filtr „Pracownicy” z wersji 4.0.5.
+- Raport PDF: nieobecności dzień po dniu - przy każdym dniu pole do wpisania (np. powód, kod) i kratka do odhaczenia.
+
 v4.0.5 (2026-11-05)
 - Filtr „Pracownicy” na pulpicie: zaznacz osoby (z wyszukiwaniem), a lista i raport błędów PDF / TXT obejmą tylko je.
 

@@ -555,10 +555,10 @@ class Api:
             self.otworz_folder(path_wynik)
         return {"ok": True, "pliki": zapisane, "pominieto": len(pomijane)}
 
-    def _tresc_txt(self, pomijane=(), pracownicy=None):
+    def _tresc_txt(self, pomijane=(), zaznaczone=None):
         linie = self.linie_raportu
-        if pracownicy:  # raport tylko dla zaznaczonych pracowników (linia: "data | Pracownik NR (nazwisko) | ...")
-            linie = [l for l in linie if (m := re.search(r"\| Pracownik (\S+) \(", l)) and m.group(1) in pracownicy]
+        if zaznaczone:  # tylko zaznaczone pozycje (linia: "data | Pracownik NR (nazwisko) | ...", id pozycji: "data|NR")
+            linie = [l for l in linie if (m := re.match(r"(\S+) \| Pracownik (\S+) \(", l)) and f"{m.group(1)}|{m.group(2)}" in zaznaczone]
         tresc = Silnik.tresc_raportu_brakow(linie)
         if pomijane:
             tresc += "\n\n--- POMINIĘTE W PLIKU ERP (niepoprawione błędy) ---\n" + "\n".join(
@@ -570,16 +570,18 @@ class Api:
             zd = self._silnik.dane_do_zapisu.get((a["data"], a["pracownik"]), [])
             return " · ".join(f"{KODY_KROTKO.get(z['kod'], z['kod'])} {format_czas_gui(z['czas'])}"
                               + (f" (RCP {format_czas_gui(z['czas_oryg'])})" if z.get("czas_oryg") not in (None, "", "---", z["czas"]) else "") for z in zd)
-        # Raport PDF = to, co zaznaczone w filtrach listy (rodzaje problemów, działy, pracownicy); bez filtra - wszystko
-        rodzaje, dzialy, pracownicy = getattr(self, "_filtr_raportu", (None, None, None))
-        wybrane = [a for a in self.anomalie if (not rodzaje or a["rodzaj"] in rodzaje) and (not dzialy or a["dzial"] in dzialy)
-                   and (not pracownicy or a["pracownik"] in pracownicy)]
+        # Raport PDF = pozycje zaznaczone na liście; bez zaznaczenia - to, co w filtrach listy (rodzaje problemów i działy)
+        rodzaje, dzialy, zaznaczone = getattr(self, "_filtr_raportu", (None, None, None))
+        if zaznaczone:
+            wybrane = [a for a in self.anomalie if a["id"] in zaznaczone]
+            rodzaje = dzialy = None
+        else:
+            wybrane = [a for a in self.anomalie if (not rodzaje or a["rodzaj"] in rodzaje) and (not dzialy or a["dzial"] in dzialy)]
         zakres = []
-        if pracownicy:
-            nazwiska = sorted({a["nazwisko"] for a in self.anomalie if a["pracownik"] in pracownicy})
-            zakres.append("pracownicy: " + (", ".join(nazwiska) if len(nazwiska) <= 6 else f"{len(nazwiska)} wybranych"))
-        if pomijane and pracownicy:
-            pomijane = [(d, p) for d, p in pomijane if p in pracownicy]
+        if zaznaczone:
+            nazwiska = sorted({a["nazwisko"] for a in wybrane})
+            zakres.append(f"zaznaczone pozycje: {len(wybrane)} - " + (", ".join(nazwiska) if len(nazwiska) <= 6 else f"{len(nazwiska)} pracowników"))
+            pomijane = [(d, p) for d, p in pomijane if f"{d}|{p}" in zaznaczone]
         if dzialy:
             nazwy_dzialow = sorted(d for d in dzialy if d in {a["dzial"] for a in self.anomalie})
             zakres.append("działy: " + ", ".join(nazwy_dzialow) if nazwy_dzialow else "żaden dział")
@@ -593,9 +595,12 @@ class Api:
                           nieobecnosci=[a for a in wybrane if a["rodzaj"] == "nieobecnosc"])
         return sciezka
 
-    def ustaw_filtr_raportu(self, rodzaje, dzialy, pracownicy=None):
-        """Filtry z listy na pulpicie - raport zawiera tylko zaznaczone rodzaje problemów, działy i pracowników (puste = wszystkie)."""
-        self._filtr_raportu = (set(rodzaje or []), set(dzialy or []), set(pracownicy or []))
+    def ustaw_filtr_raportu(self, rodzaje, dzialy, zaznaczone=None):
+        """
+        Raport z pulpitu: pozycje zaznaczone na liście (id "data|nr"); bez zaznaczenia - filtry listy: rodzaje problemów
+        i działy (puste = wszystkie).
+        """
+        self._filtr_raportu = (set(rodzaje or []), set(dzialy or []), set(zaznaczone or []))
         return {"ok": True}
 
     def eksport_raportu(self, format_):
@@ -611,7 +616,7 @@ class Api:
             self._zapisz_pdf(sciezka)
         else:
             with open(sciezka, "w", encoding="utf-8") as f:
-                f.write(self._tresc_txt(pracownicy=getattr(self, "_filtr_raportu", (None, None, None))[2]))
+                f.write(self._tresc_txt(zaznaczone=getattr(self, "_filtr_raportu", (None, None, None))[2]))
         os.startfile(sciezka)
         return {"ok": True, "plik": sciezka}
 
