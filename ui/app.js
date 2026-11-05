@@ -444,7 +444,7 @@ function rysujListe() {
   box.innerHTML = `<table class="tab"><thead><tr><th class="w-zazn"><input type="checkbox" id="zazn-wszystkie" title="Zaznacz / odznacz wszystkie widoczne pozycje"></th>${kol.map(([p, n]) => `<th data-sort="${p}">${n}${strz(p)}</th>`).join('')}<th></th></tr></thead><tbody>
     ${l.map((a) => `<tr data-id="${esc(a.id)}" class="${a.status ? 'sprawdzony' : ''} ${a.id === wybranyId ? 'wybrany' : ''} ${zaznaczone.has(a.id) ? 'zaznaczony' : ''}">
       <td class="w-zazn"><input type="checkbox" class="zazn" ${zaznaczone.has(a.id) ? 'checked' : ''} title="Zaznacz do raportu"></td>
-      <td>${a.status === 'sprawdzone' ? `<span class="stan-ikona ok" title="Sprawdzone">${ik('ok')}</span>` : a.status ? `<span class="stan-ikona pom" title="Pominięte">–</span>` : '<span class="stan-ikona"></span>'}</td>
+      <td>${a.status === 'sprawdzone' ? `<span class="stan-ikona ok" title="Sprawdzone">${ik('ok')}</span>` : a.status ? `<span class="stan-ikona pom" title="Pominięte">–</span>` : ''}</td>
       <td class="data">${dataKr(a.data)}<small>${dzienTyg(a.data)}</small></td><td class="nr">${esc(a.pracownik)}</td>
       <td class="nazwisko">${esc(a.nazwisko)}</td><td class="dzial" title="${esc(a.dzial)}">${esc(a.dzial)}</td><td class="zmiana">${esc(zmianaKr(a.typ_zmiany))}</td>
       <td>${tagi(a.uwaga)}${a.reczna ? '<span class="tag reczna">poprawione ręcznie</span>' : ''}</td>
@@ -1066,18 +1066,17 @@ async function rysujPracownikow() {
 }
 
 /** Formularz propozycji (dodanie / zmiana danych / odejście), potem pytanie, czy wysłać do administratora. */
-async function oknoPropozycji(typ, p = null) {
-  const dzialy = `<datalist id="pr-dzialy">${(prac.dane?.dzialy || []).map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
+async function oknoPropozycji(typ, p = null, wpisane = null) {
   const tytul = { dodaj: 'Nowy pracownik', zmien: `Zmiana danych: ${esc(p?.nazwisko)}`, odejscie: `Nie pracuje: ${esc(p?.nazwisko)}` }[typ];
   const pole = (id, et, html) => `<div><label class="etykieta" for="${id}">${et}</label>${html}</div>`;
   const tresc = typ === 'odejscie'
     ? `<p class="podp" style="margin-top:0">${esc(p.nr)} · ${esc(p.dzial || 'bez działu')}</p>
        ${pole('pr-do', 'Nie pracuje od dnia', `<input class="pole" type="date" id="pr-do" value="${dzisiaj()}">`)}
        <p class="podp">Do dnia wcześniej pracownik jest sprawdzany normalnie, od tej daty - pomijany (bez nieobecności).</p>`
-    : `${dzialy}<div class="formularz-prop">
+    : `<div class="formularz-prop">
        ${pole('pr-nazwisko', 'Nazwisko i imię', `<input class="pole" id="pr-nazwisko" value="${esc(p?.nazwisko || '')}" spellcheck="false" placeholder="np. Kowalski Jan">`)}
-       ${pole('pr-dzial', 'Dział', `<input class="pole" id="pr-dzial" list="pr-dzialy" value="${esc(p?.dzial || '')}" placeholder="wybierz albo wpisz">`)}
-       ${typ === 'dodaj' ? pole('pr-nr', 'Numer w Roger RCP (jeśli znany)', '<input class="pole" id="pr-nr" inputmode="numeric" placeholder="np. 0123">') : ''}
+       ${pole('pr-dzial', 'Dział', `<select class="pole" id="pr-dzial">${typ === 'dodaj' ? '<option value="">— wybierz dział —</option>' : ''}${(prac.dane?.dzialy || []).map((x) => `<option ${x === (p?.dzial || '') ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`)}
+       ${typ === 'dodaj' ? pole('pr-nr', 'Numer w Roger RCP (4 cyfry)', '<input class="pole" id="pr-nr" inputmode="numeric" maxlength="4" placeholder="np. 0123">') : ''}
        ${pole('pr-od', 'Sprawdzany od dnia', `<input class="pole" type="date" id="pr-od" value="${typ === 'dodaj' ? dzisiaj() : p?.od || ''}">`)}</div>
        <p class="podp">${typ === 'dodaj' ? 'Przed tą datą pracownik nie jest sprawdzany - np. zatrudniony w połowie miesiąca nie ma nieobecności za pierwszą połowę.' : 'Zmień tylko to, co ma być inne - administrator zobaczy obecne i proponowane dane.'}</p>`;
   let el = null;
@@ -1085,12 +1084,21 @@ async function oknoPropozycji(typ, p = null) {
     tytul: `${ik('ludzie')} ${tytul}`, szeroki: true,
     tresc: `${tresc}${pole('pr-uwagi', 'Uwagi dla administratora (opcjonalnie)', '<textarea class="pole" id="pr-uwagi" rows="2"></textarea>')}`,
     przyciski: [{ tekst: 'Anuluj', wartosc: null }, { tekst: 'Dalej', klasa: 'btn-hr', wartosc: 'dalej', domyslny: true }],
-    poOtwarciu: (x) => { el = x; },
+    poOtwarciu: (x) => {
+      el = x;
+      if (wpisane) for (const [k, id] of [['nazwisko', 'pr-nazwisko'], ['nr', 'pr-nr'], ['dzial', 'pr-dzial'], ['od', 'pr-od'], ['do', 'pr-do'], ['komentarz', 'pr-uwagi']]) {
+        const f = $(`#${id}`, x);
+        if (f && wpisane[k] !== undefined) f.value = wpisane[k];
+      }
+    },
   });
   if (w !== 'dalej') return;
   const v = (id) => ($(`#${id}`, el)?.value || '').trim();
   const prop = { typ, nr: typ === 'dodaj' ? v('pr-nr') : p.nr, nazwisko: v('pr-nazwisko'), dzial: v('pr-dzial'), od: v('pr-od'), do: v('pr-do'), komentarz: v('pr-uwagi') };
-  if (typ === 'dodaj' && !prop.nazwisko) { toast('Podaj nazwisko i imię.', 'blad'); return oknoPropozycji(typ, p); }
+  if (typ === 'dodaj') {  // nowy pracownik: wszystkie dane obowiązkowe
+    const brak = [!prop.nazwisko && 'nazwisko i imię', !/^\d{4}$/.test(prop.nr) && 'numer RCP (4 cyfry, np. 0123)', !prop.dzial && 'dział', !prop.od && 'data „sprawdzany od”'].filter(Boolean);
+    if (brak.length) { toast(`Uzupełnij: ${brak.join(', ')}.`, 'blad'); return oknoPropozycji(typ, p, prop); }
+  }
   if (typ === 'odejscie' && !prop.do) { toast('Podaj datę, od której pracownik nie pracuje.', 'blad'); return oknoPropozycji(typ, p); }
   if (typ === 'zmien') {  // tylko zmienione pola
     if (prop.nazwisko === p.nazwisko) prop.nazwisko = '';
