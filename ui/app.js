@@ -1070,9 +1070,10 @@ async function rysujPracownikow() {
       <tr class="${p.do || p.ignorowany ? 'sprawdzony' : ''}"><td class="nr">${esc(p.nr)}</td><td class="nazwisko">${esc(p.nazwisko)}</td><td class="dzial">${esc(p.dzial || '—')}</td>
         <td>${p.do ? `<span class="tag">nie pracuje od ${dataPl(p.do)}</span>` : p.ignorowany ? '<span class="tag">ignorowany / nie pracuje</span>' : '<span class="tag ok-tag">pracuje</span>'}${p.od ? ` <span class="tag">sprawdzany od ${dataPl(p.od)}</span>` : ''}</td>
         <td style="text-align:right; white-space:nowrap"><button class="btn btn-maly" data-pr-zmien="${esc(p.nr)}">Zmień dane</button>
-          ${p.do || p.ignorowany ? '' : `<button class="btn btn-maly" data-pr-odejscie="${esc(p.nr)}">Nie pracuje</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="pusto">Brak pracowników dla wyszukiwania.</td></tr>';
+          ${p.do || p.ignorowany ? `<button class="btn btn-maly" data-pr-powrot="${esc(p.nr)}">Pracuje ponownie</button>` : `<button class="btn btn-maly" data-pr-odejscie="${esc(p.nr)}">Nie pracuje</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="pusto">Brak pracowników dla wyszukiwania.</td></tr>';
     $$('[data-pr-zmien]').forEach((b) => b.onclick = () => oknoPropozycji('zmien', d.pracownicy.find((p) => p.nr === b.dataset.prZmien)));
     $$('[data-pr-odejscie]').forEach((b) => b.onclick = () => oknoPropozycji('odejscie', d.pracownicy.find((p) => p.nr === b.dataset.prOdejscie)));
+    $$('[data-pr-powrot]').forEach((b) => b.onclick = () => oknoPropozycji('powrot', d.pracownicy.find((p) => p.nr === b.dataset.prPowrot)));
   };
   lista();
   $('#pr-szukaj').oninput = (e) => { prac.szukaj = e.target.value; lista(); };
@@ -1081,9 +1082,13 @@ async function rysujPracownikow() {
 
 /** Formularz propozycji (dodanie / zmiana danych / odejście), potem pytanie, czy wysłać do administratora. */
 async function oknoPropozycji(typ, p = null, wpisane = null) {
-  const tytul = { dodaj: 'Nowy pracownik', zmien: `Zmiana danych: ${esc(p?.nazwisko)}`, odejscie: `Nie pracuje: ${esc(p?.nazwisko)}` }[typ];
+  const tytul = { dodaj: 'Nowy pracownik', zmien: `Zmiana danych: ${esc(p?.nazwisko)}`, odejscie: `Nie pracuje: ${esc(p?.nazwisko)}`, powrot: `Pracuje ponownie: ${esc(p?.nazwisko)}` }[typ];
   const pole = (id, et, html) => `<div><label class="etykieta" for="${id}">${et}</label>${html}</div>`;
-  const tresc = typ === 'odejscie'
+  const tresc = typ === 'powrot'
+    ? `<p class="podp" style="margin-top:0">${esc(p.nr)} · ${esc(p.dzial || 'bez działu')} · obecnie: ${p.do ? `nie pracuje od ${dataPl(p.do)}` : 'ignorowany / nie pracuje'}</p>
+       ${pole('pr-od', 'Pracuje ponownie od dnia', `<input class="pole" type="date" id="pr-od" value="${dzisiaj()}">`)}
+       <p class="podp">Od tej daty pracownik jest znowu sprawdzany (wcześniejsze dni bez nieobecności). Nazwisko i dział zostają - zmienisz je przyciskiem „Zmień dane”.</p>`
+    : typ === 'odejscie'
     ? `<p class="podp" style="margin-top:0">${esc(p.nr)} · ${esc(p.dzial || 'bez działu')}</p>
        ${pole('pr-do', 'Nie pracuje od dnia', `<input class="pole" type="date" id="pr-do" value="${dzisiaj()}">`)}
        <p class="podp">Do dnia wcześniej pracownik jest sprawdzany normalnie, od tej daty - pomijany (bez nieobecności).</p>`
@@ -1114,6 +1119,7 @@ async function oknoPropozycji(typ, p = null, wpisane = null) {
     if (brak.length) { toast(`Uzupełnij: ${brak.join(', ')}.`, 'blad'); return oknoPropozycji(typ, p, prop); }
   }
   if (typ === 'odejscie' && !prop.do) { toast('Podaj datę, od której pracownik nie pracuje.', 'blad'); return oknoPropozycji(typ, p); }
+  if (typ === 'powrot' && !prop.od) { toast('Podaj datę, od której pracownik pracuje ponownie.', 'blad'); return oknoPropozycji(typ, p); }
   if (typ === 'zmien') {  // tylko zmienione pola
     if (prop.nazwisko === p.nazwisko) prop.nazwisko = '';
     if (prop.dzial === (p.dzial || '')) prop.dzial = '';
@@ -1124,7 +1130,7 @@ async function oknoPropozycji(typ, p = null, wpisane = null) {
     typ === 'dodaj' ? `Nowy pracownik: <b>${esc(prop.nazwisko)}</b>${prop.nr ? ` (nr ${esc(prop.nr)})` : ''}` : `<b>${esc(p.nazwisko)}</b> (nr ${esc(p.nr)})`,
     prop.nazwisko && typ === 'zmien' && `nazwisko i imię: ${esc(p.nazwisko)} → <b>${esc(prop.nazwisko)}</b>`,
     prop.dzial && (typ === 'zmien' ? `dział: ${esc(p.dzial || '—')} → <b>${esc(prop.dzial)}</b>` : `dział: <b>${esc(prop.dzial)}</b>`),
-    prop.od && `sprawdzany od: <b>${dataPl(prop.od)}</b>`, prop.do && `nie pracuje od: <b>${dataPl(prop.do)}</b>`, prop.komentarz && `uwagi: ${esc(prop.komentarz)}`,
+    typ === 'powrot' && `<b>pracuje ponownie</b> od: <b>${dataPl(prop.od)}</b>`, typ !== 'powrot' && prop.od && `sprawdzany od: <b>${dataPl(prop.od)}</b>`, prop.do && `nie pracuje od: <b>${dataPl(prop.do)}</b>`, prop.komentarz && `uwagi: ${esc(prop.komentarz)}`,
   ].filter(Boolean);
   const ok = await modal({
     tytul: `${ik('wyslij')} Wysłać propozycję?`,
