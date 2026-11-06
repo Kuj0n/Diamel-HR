@@ -387,13 +387,16 @@ function rysujPulpit() {
 function banerDomkniecia(s) {
   const d = s.domkniecie;
   if (!d?.dzien) return '';
-  const dz = dataKr(d.dzien), poprz = dataKr(s.statystyki.do);
-  if (d.wlaczone) return `<div class="baner niebieski">${ik('info')}<div class="tekst"><b>${dz} - dzień domknięcia nocnych zmian${d.auto ? ' (eksport z dnia wygenerowania)' : ''}</b>
-      Z ${dz} wzięto tylko wyjścia po północy zamykające zmiany z ${poprz} (${d.przeniesione}). Pozostałe odbicia z ${dz} pominięto - będą w następnym eksporcie.</div>
-      <button class="btn btn-maly" id="p-domkniecie" data-v="0">Licz ${dz} normalnie</button></div>`;
-  if (d.bez_wyjscia) return `<div class="baner zolty">${ik('uwaga')}<div class="tekst"><b>${dz}: ${d.bez_wyjscia} ${odmiana(d.bez_wyjscia, 'osoba', 'osoby', 'osób')} bez wyjścia na koniec pliku</b>
-      Zmiany kończące się po północy wychodzą poza eksport. Wyeksportuj z RCP także następny dzień - program weźmie z niego tylko nocne wyjścia.</div>
-      <button class="btn btn-maly" id="p-domkniecie" data-v="1">${dz} tylko do domknięcia</button></div>`;
+  const [r, m, dd] = d.dzien.split('.').map(Number);
+  const wczoraj = new Date(r, m - 1, dd - 1);
+  const dz = dataKr(d.dzien), poprz = `${String(wczoraj.getDate()).padStart(2, '0')}.${String(wczoraj.getMonth() + 1).padStart(2, '0')}`;
+  if (d.wlaczone) return `<div class="baner niebieski">${ik('info')}<div class="tekst"><b>Rozliczono do ${poprz}. Dzień ${dz} nie jest liczony${d.auto ? ' - plik wygenerowano tego dnia, więc dzień jest jeszcze niepełny' : ''}.</b>
+      Z ${dz} program wziął tylko wyjścia o północy i po północy, którymi pracownicy zakończyli zmianę z ${poprz} (${d.przeniesione}). Osoby, które ${dz} przyszły do pracy, zostaną sprawdzone w następnym eksporcie.</div>
+      <button class="btn btn-maly" id="p-domkniecie" data-v="0" title="Policz ${dz} jak zwykły, pełny dzień">Rozlicz także ${dz}</button></div>`;
+  if (d.bez_wyjscia) return `<div class="baner zolty">${ik('uwaga')}<div class="tekst"><b>${dz}: ${d.bez_wyjscia} ${odmiana(d.bez_wyjscia, 'osoba', 'osoby', 'osób')} bez wyjścia na końcu pliku</b>
+      Jeśli to zmiany kończące się o północy, ich wyjście jest zapisane w RCP już pod datą następnego dnia. Wyeksportuj z RCP plik do dnia następnego (najlepiej do dziś) - program weźmie z niego tylko te nocne wyjścia.
+      Jeśli ${dz} to dzisiejszy, niepełny dzień, kliknij „Rozlicz tylko do ${poprz}”.</div>
+      <button class="btn btn-maly" id="p-domkniecie" data-v="1" title="Z ${dz} program weźmie tylko wyjścia po północy zamykające zmiany z ${poprz}, resztę dnia pominie">Rozlicz tylko do ${poprz}</button></div>`;
   return '';
 }
 

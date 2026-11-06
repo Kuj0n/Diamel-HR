@@ -121,7 +121,7 @@ class Silnik:
             
             naprawione_zdarzenia_pracownika = []
             for curr in zdarzenia_pracownika:
-                # To samo odbicie nocne zarejestrowane dwa razy (np. dwa razy 00:00 kod 16) - pierwsze już zamknęło
+                # Pracownik odbił to samo wyjście nocne kilka razy (np. dwa razy 00:00 kod 16) - pierwsze już zamknęło
                 # wczorajszą zmianę, drugie byłoby osieroconym wyjściem na początku dnia
                 prev = naprawione_zdarzenia_pracownika[-1] if naprawione_zdarzenia_pracownika else None
                 if prev and prev.get('_oryg') == (curr['data'], curr['czas'], curr['kod']):
