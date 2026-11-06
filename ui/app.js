@@ -339,6 +339,7 @@ function rysujPulpit() {
       <div class="karta stat ${st.do_sprawdzenia ? 'czerwony' : 'zielony'}"><b>${liczba(st.do_sprawdzenia)}</b><span>do sprawdzenia · ${liczba(st.sprawdzone)} z ${liczba(wszystkie)} gotowe</span>
         <div class="postep"><i style="width:${wszystkie ? Math.round(100 * (wszystkie - st.do_sprawdzenia) / wszystkie) : 100}%"></i></div></div>
     </div>
+    ${banerDomkniecia(s)}
     <section class="karta lista">
       <div class="naglowek">
         <div class="segment tryb-listy">
@@ -370,6 +371,7 @@ function rysujPulpit() {
   $('#p-rcp').onclick = wybierzRcp;
   $('#p-urlopy').onclick = wybierzUrlopy;
   $('#p-przetworz').onclick = przetworz;
+  $('#p-domkniecie')?.addEventListener('click', async (e) => nowyStan(await api('ustaw_domkniecie', e.currentTarget.dataset.v === '1')));
   $('#p-dodaj').onclick = () => dodajZdarzenieRecznie();
   $$('[data-tryb]').forEach((b) => b.onclick = () => { filtr.tryb = b.dataset.tryb; rysujPulpit(); });
   $('#p-zapisz').onclick = () => zapiszErp();
@@ -379,6 +381,20 @@ function rysujPulpit() {
   $('#f-dzialy-przycisk').onclick = (e) => { e.stopPropagation(); przelaczListeDzialow(s); };
   $('#f-szukaj').oninput = (e) => { filtr.szukaj = e.target.value; rysujListe(); };
   $('#f-sprawdzone').onclick = (e) => { filtr.ukryjSprawdzone = !filtr.ukryjSprawdzone; e.currentTarget.classList.toggle('akt'); rysujListe(); };
+}
+
+// Dzień domknięcia: niepełny ostatni dzień eksportu - tylko wyjścia po północy zamykające zmianę z poprzedniego dnia
+function banerDomkniecia(s) {
+  const d = s.domkniecie;
+  if (!d?.dzien) return '';
+  const dz = dataKr(d.dzien), poprz = dataKr(s.statystyki.do);
+  if (d.wlaczone) return `<div class="baner niebieski">${ik('info')}<div class="tekst"><b>${dz} - dzień domknięcia nocnych zmian${d.auto ? ' (eksport z dnia wygenerowania)' : ''}</b>
+      Z ${dz} wzięto tylko wyjścia po północy zamykające zmiany z ${poprz} (${d.przeniesione}). Pozostałe odbicia z ${dz} pominięto - będą w następnym eksporcie.</div>
+      <button class="btn btn-maly" id="p-domkniecie" data-v="0">Licz ${dz} normalnie</button></div>`;
+  if (d.bez_wyjscia) return `<div class="baner zolty">${ik('uwaga')}<div class="tekst"><b>${dz}: ${d.bez_wyjscia} ${odmiana(d.bez_wyjscia, 'osoba', 'osoby', 'osób')} bez wyjścia na koniec pliku</b>
+      Zmiany kończące się po północy wychodzą poza eksport. Wyeksportuj z RCP także następny dzień - program weźmie z niego tylko nocne wyjścia.</div>
+      <button class="btn btn-maly" id="p-domkniecie" data-v="1">${dz} tylko do domknięcia</button></div>`;
+  return '';
 }
 
 function opisDzialow(wszystkie) {

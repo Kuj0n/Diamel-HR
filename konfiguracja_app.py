@@ -4,10 +4,18 @@ import sys
 # ==========================================
 # KONFIGURACJA I METADANE
 # ==========================================
-VERSION = "4.0.9"
-BUILD_DATE = "2026-11-05 19:00"
+VERSION = "4.0.10"
+BUILD_DATE = "2026-11-06 10:00"
 
 CHANGELOG = """
+v4.0.10 (2026-11-06)
+- Zmiany kończące się po północy na końcu eksportu: gdy ostatni dzień w pliku to dzień wygenerowania eksportu (eksport
+  z RCP do dziś), program bierze z niego tylko nocne wyjścia zamykające zmiany z poprzedniego dnia, a resztę odbić z tego
+  dnia pomija (będą w następnym eksporcie). Na pulpicie baner z przełącznikiem; przy eksporcie do wczoraj - podpowiedź,
+  ile osób nie ma wyjścia na koniec pliku.
+- Naprawa: to samo wyjście o północy zarejestrowane w RCP kilka razy nie zostaje już jako osierocone wyjście na początku
+  następnego dnia (błędy „Pierwsze odbicie to nie Wejście” i „zbyt wiele zakończeń pracy”).
+
 v4.0.9 (2026-11-05)
 - Pierwsza aktualizacja bez klikania instalatora: program pobiera nową wersję, instaluje ją w tle i uruchamia się ponownie sam.
 

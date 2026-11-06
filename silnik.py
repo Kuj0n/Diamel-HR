@@ -79,9 +79,18 @@ class Silnik:
             for klucz in LISTY_ZMIAN:
                 self.u[klucz] = listy.get(klucz, DOMYSLNE[klucz])
 
-    def przetworz(self, linie):
-        """Pełne przetworzenie pliku RCP (lista linii). Zwraca (wpisy_anomalii, wszyscy_info, linie_raportu)."""
-        self.przetworz_slownik_zdarzen(self.grupuj_zdarzenia(linie))
+    def przetworz(self, linie, dzien_domkniecia=None):
+        """
+        Pełne przetworzenie pliku RCP (lista linii). Zwraca (wpisy_anomalii, wszyscy_info, linie_raportu).
+        dzien_domkniecia (RRRR.MM.DD): niepełny ostatni dzień pliku (eksport z dnia wygenerowania) - bierzemy z niego tylko
+        odbicia nocne zamykające zmianę z poprzedniego dnia (przeniesione jako 24:xx), reszta tego dnia jest pomijana.
+        """
+        dane = self.grupuj_zdarzenia(linie)
+        self.domkniete_z_dnia = 0
+        if dzien_domkniecia:
+            self.domkniete_z_dnia = sum(1 for z in self.przeniesione if z == dzien_domkniecia)
+            dane = {k: v for k, v in dane.items() if k[0] != dzien_domkniecia}
+        self.przetworz_slownik_zdarzen(dane)
         return self.generuj_raporty()
 
     def grupuj_zdarzenia(self, linie):
@@ -95,6 +104,7 @@ class Silnik:
 
         pracownicy = set(z['pracownik'] for z in wszystkie_zdarzenia)
         naprawione_zdarzenia = []
+        self.przeniesione = []  # daty, z których odbicia nocne przeniesiono do poprzedniego dnia (24:xx)
         
         limit_nocny = self.u['midnight_limit'] if self.u['chk_midnight'] else "00:00"
         limit_nocny_minuty = parse_czas_do_minut(limit_nocny)
@@ -111,6 +121,11 @@ class Silnik:
             
             naprawione_zdarzenia_pracownika = []
             for curr in zdarzenia_pracownika:
+                # To samo odbicie nocne zarejestrowane dwa razy (np. dwa razy 00:00 kod 16) - pierwsze już zamknęło
+                # wczorajszą zmianę, drugie byłoby osieroconym wyjściem na początku dnia
+                prev = naprawione_zdarzenia_pracownika[-1] if naprawione_zdarzenia_pracownika else None
+                if prev and prev.get('_oryg') == (curr['data'], curr['czas'], curr['kod']):
+                    continue
                 # Przesuwamy zdarzenia po północy do poprzedniego dnia, by zachować chronologię
                 if self.u['chk_midnight']:
                     if parse_czas_do_minut(curr['czas']) <= limit_nocny_minuty:
@@ -124,6 +139,8 @@ class Silnik:
                                 # Przesuwamy tylko, gdy wczorajsza zmiana nie jest jeszcze zamknięta wyjściem!
                                 if prev['kod'] not in ['16', '25']:
                                     if (dt_curr - dt_prev).days == 1 or (dt_curr == dt_prev and g_prev >= 24):
+                                        curr['_oryg'] = (curr['data'], curr['czas'], curr['kod'])
+                                        self.przeniesione.append(curr['data'])
                                         curr['data'] = prev['data'][:10]
                                         godz, minuty = map(int, curr['czas'].split(':'))
                                         curr['czas'] = f"{24 + godz:02d}:{minuty:02d}"

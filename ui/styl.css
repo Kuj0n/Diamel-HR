@@ -392,3 +392,6 @@ kbd { font-family: var(--font-kod); font-size: 0.72rem; padding: 1px 6px; border
 .formularz-prop .pole, .tresc-modala textarea.pole, .tresc-modala input[type=date].pole { width: 100%; box-sizing: border-box; }
 .lista-propozycji { margin: 0 0 10px; padding-left: 18px; line-height: 1.7; }
 .naglowek-karty { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.baner.niebieski { border-color: color-mix(in srgb, var(--kolor-2) 50%, transparent); background: var(--niebieski-tlo); }
+.baner.niebieski svg { color: var(--kolor-2); }
+.baner .tekst { flex: 1; }

@@ -381,6 +381,7 @@ class Api:
                 return {"ok": False, "blad": "To nie wygląda na plik RCP (data.godzina;numer;kod)."}
             if os.path.abspath(sciezka) != os.path.abspath(self.plik_rcp or ""):
                 self.reczne, self.statusy, self.id_historii = {}, {}, None
+                self.domkniecie_wybor = None  # nowy plik - dzień domknięcia wykrywany automatycznie
             self.plik_rcp, self.linie_rcp = sciezka, linie
         return self.przetworz()
 
@@ -390,13 +391,39 @@ class Api:
         if not self.linie_rcp:
             return self.stan()
         s = Silnik(self.reguly_aktualne(), self.dane_serwera, self.urlopy)
-        s.przetworz(self.linie_rcp)
+        s.przetworz(self.linie_rcp, self._domkniecie()["dzien"] if self._domkniecie()["wlaczone"] else None)
         for klucz, zdarzenia in self.reczne.items():
             s.dane_do_zapisu[klucz] = [dict(z) for z in zdarzenia]
         self._silnik = s
         self._odswiez_anomalie()
         self._zapisz_historie()
         return self.stan()
+
+    def _domkniecie(self):
+        """
+        Dzień domknięcia nocnych zmian: ostatni dzień w pliku, gdy to dzień wygenerowania eksportu (z nazwy pliku
+        "ERP HR_RRRRMMDDggmmss.txt", inaczej data zapisu pliku) - jest niepełny, służy tylko do zamknięcia zmian
+        kończących się po północy. Użytkownik może to zmienić przełącznikiem na pulpicie (domkniecie_wybor).
+        """
+        daty = sorted({l[:10] for l in self.linie_rcp if len(l.strip().split(";")) == 3})
+        if not daty:
+            return {"dzien": "", "wygenerowano": "", "auto": False, "wlaczone": False}
+        m = re.search(r"(20\d{2})(\d{2})(\d{2})\d{6}", os.path.basename(self.plik_rcp or ""))
+        if m:
+            wygenerowano = f"{m.group(1)}.{m.group(2)}.{m.group(3)}"
+        else:
+            try:
+                wygenerowano = datetime.fromtimestamp(os.path.getmtime(self.plik_rcp)).strftime("%Y.%m.%d")
+            except OSError:
+                wygenerowano = ""
+        auto = len(daty) > 1 and daty[-1] == wygenerowano
+        wybor = getattr(self, "domkniecie_wybor", None)
+        return {"dzien": daty[-1], "wygenerowano": wygenerowano, "auto": auto, "wlaczone": auto if wybor is None else bool(wybor) and len(daty) > 1}
+
+    def ustaw_domkniecie(self, wlaczone):
+        """Przełącznik z pulpitu: ostatni dzień pliku tylko do domknięcia nocnych zmian (True) albo jak każdy inny (False)."""
+        self.domkniecie_wybor = bool(wlaczone)
+        return self.przetworz()
 
     def _odswiez_anomalie(self):
         wpisy, _, self.linie_raportu = self._silnik.generuj_raporty()
@@ -417,7 +444,7 @@ class Api:
             "pracownikow": len({l.strip().split(";")[1] for l in zrodlo}),
             "zdarzen": len(zrodlo), "w_pliku_erp": len(wynik), "skorygowane": zmienione,
             "usuniete": max(0, len(zrodlo) - len(wynik)),
-            "od": daty[0] if daty else "", "do": daty[-1] if daty else "",
+            "od": daty[0] if daty else "", "do": (daty[-2] if self._domkniecie()["wlaczone"] and len(daty) > 1 else daty[-1]) if daty else "",
             "bledy": licz("blad"), "niepelne": licz("niepelny"), "ostrzezenia": licz("ostrzezenie"), "nieobecnosci": licz("nieobecnosc"),
             # Gotowe = oznaczone jako sprawdzone + poprawione ręcznie (poprawiony dzień zwykle znika z listy)
             "do_sprawdzenia": len(do_spr),
@@ -431,7 +458,14 @@ class Api:
                    "pracownikow": len(self.urlopy), "dni": sum(len(v) for v in self.urlopy.values())} if self.plik_urlopow else None)
         return {"ok": True, "rcp": rcp, "urlopy": urlopy, "statystyki": self._statystyki() if self._silnik else None,
                 "anomalie": self.anomalie, "reczne": len(self.reczne), "zmienione_reguly": len(self.reguly_lokalne),
-                "dzialy": sorted({a["dzial"] for a in self.anomalie})}
+                "dzialy": sorted({a["dzial"] for a in self.anomalie}), "domkniecie": self._stan_domkniecia() if self._silnik else None}
+
+    def _stan_domkniecia(self):
+        d = self._domkniecie()
+        ostatni = d["dzien"]
+        # bez dnia domknięcia: ilu pracowników w ostatnim dniu nie ma wyjścia (zmiana kończąca się po północy, poza eksportem)
+        bez_wyjscia = len({a["pracownik"] for a in self.anomalie if a["data"] == ostatni and "Brak wyjścia" in a["uwaga"]}) if not d["wlaczone"] else 0
+        return {**d, "przeniesione": getattr(self._silnik, "domkniete_z_dnia", 0), "bez_wyjscia": bez_wyjscia}
 
     # ------------------------------------------------------------------ korekta dnia
 
